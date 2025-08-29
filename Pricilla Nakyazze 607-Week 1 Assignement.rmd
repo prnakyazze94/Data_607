@@ -1,0 +1,190 @@
+---
+title: "Pricilla Nakyazze 607-Week 1 Assignement"
+output: pdf_document
+date: "2025-08-26"
+---
+
+Introduction
+
+Choosing a college major is more than just following one's passion. It can have a measurable impact on future earnings. Even among closely related fields, significant differences in income potential exist. For instance, actuarial science majors tend to out-earn accounting majors, and public policy majors see better earnings outcomes than history majors. Interestingly, vocational fields like court reporting may offer better returns than more traditional majors like criminology. While earning a college degree does not guarantee economic success, data clearly shows that choosing the right major can improve the odds of financial stability.
+
+The full Article on choince of major's impact on employment can be found here: https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("readr")
+```
+
+```{r libraries}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(ggplot2)
+
+
+```
+  
+
+##1.1 Load the college majors-all ages data into a data frame and preview.
+```{r}
+majors_data <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/college-majors/all-ages.csv")
+glimpse(majors_data)
+```
+## Select the Major column and return it as a vector
+
+```{r}
+majors <- majors_data |> 
+  select(Major) |> 
+  pull()
+head(majors, n=12)
+```
+## Identifies the majors that contain  "AGRICULTURE" 
+
+```{r}
+str_view(majors, "AGRICULTURE")
+```
+
+students must approach their college decisions with care. Choosing a major with stronger labor market outcomes not only boosts earning potential but also reduces the risk of graduating into low-income brackets. The worst-case scenario? Ending up in the bottom 25% of earners, where attending college may not have paid off financially. Psychology is considered a major with lor return on Investment. Business majors are often influenced by many variables so that even though unemployment is high the number of students that are gainfully employed after graduating is high as well.
+
+# Get top 4 majors with most unemployed graduates.
+```{r}
+top4_unemployed_majors <- majors_data |>
+  dplyr::arrange(desc(Unemployed)) |>
+  head(4) |>
+  dplyr::arrange(Unemployed)
+
+# View the result
+print(top4_unemployed_majors)
+```
+library(dplyr)
+
+# Get top 10 majors with most unemployed, showing specific columns, sorted in ascending order
+```{r}
+top10_unemployed_majors <- majors_data |>
+  arrange(desc(Unemployed)) |>
+  slice_head(n = 10) |>
+  arrange(Unemployed) |>
+  select(Major, Total, Employed, Employed_full_time_year_round, Unemployed)
+
+# View the result
+print(top10_unemployed_majors)
+```
+# Get top 4 majors with highest employed graduates, sorted in ascending order
+```{r}
+top4_employed_majors <- majors_data |>
+  dplyr::arrange(desc(Employed)) |>
+  head(4) |>
+  dplyr::arrange(Employed)
+
+# View the result
+print(top4_employed_majors)
+```
+
+
+A more accurate way to tell the return on investment on a course is by percentage of students employed.
+```{r}
+# Calculate unemployment percentage and get top 10 majors with highest % unemployed
+top10_unemployed_pct <- majors_data |>
+  mutate(Unemployment_Percent = (Unemployed / Employed) * 100) |>
+  arrange(desc(Unemployment_Percent)) |>
+  slice_head(n = 10) |>
+  arrange(Unemployment_Percent)  # Ascending order for plotting
+
+
+# Plot
+ggplot(top10_unemployed_pct, aes(x = reorder(Major, Unemployment_Percent),
+                                y = Unemployment_Percent,
+                                fill = Unemployment_Percent)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = sprintf("%.1f%%", Unemployment_Percent)), 
+            hjust = 1.1, color = "white", size = 3) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  coord_flip() +
+  labs(
+    title = "High Unemployment rate (%)",
+    x = "Major",
+    y = "Unemployment Rate (%)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")  # optional: remove legend if not needed
+```
+
+
+```{r}
+##PercentageEmployed = Employed / (Employed + Unemployed) * 100
+
+
+
+# Create summary table
+employment_summary <- majors_data |>
+  mutate(PercentageEmployed = round(Employed / (Employed + Unemployed) * 100, 2)) |>
+  select(Major, Employed, Unemployed, PercentageEmployed)
+
+# View the result
+print(employment_summary)
+```
+
+
+```{r}
+
+# Filter the 20 lowest percentage employed majors
+lowest_20 <- employment_summary |>
+  arrange(PercentageEmployed) |>
+  slice_head(n = 20)
+# Plot
+ggplot(lowest_20, aes(x = reorder(Major, PercentageEmployed),
+                      y = PercentageEmployed,
+                      fill = PercentageEmployed)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  geom_text(aes(label = paste0(PercentageEmployed, "%")),
+            hjust = 1.1, color = "white", size = 3) +
+  labs(
+    title = "20 Majors with highest ROI",
+    x = "Major",
+    y = "Percentage Employed"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+
+
+
+
+
+
+
+
+
+Conclusions 
+
+Despite growing doubts about the value of a college degree, research shows that a bachelor’s degree remains a worthwhile investment overall. In fact, a recent study by the Federal Reserve Bank of New York finds that the financial return on a college degree is near its historical peak,even after accounting for rising tuition costs.
+
+That said, students must approach their college decisions with care. Choosing a major with stronger labor market outcomes not only boosts earning potential but also reduces the risk of graduating into low-income brackets. The worst-case scenario? Ending up in the bottom 25% of earners, where attending college may not have paid off financially.
+
+Recommendations.
+
+Evaluate return on investment when selecting a major.
+Use non conventional means to get an education like mentoring, internships and apprenticeships.
+
+Research earnings data by major, ideally from reliable sources like the U.S. Census or labor market studies and Pay scale
+
+Schools should be transparent about the return on investment for different majors and policies supported that make this kind of data more accessible to prospective students.
+
+By combining informed decision-making with personal interests, students can pursue degrees that offer both fulfillment and financial stability.
+
+
+RESOURCES
+
+CHATGPT
+
+https://fivethirtyeight.com/features/the-economic-guide-to-picking-a-college-major/
+
+https://www.geeksforgeeks.org/r-language/graph-plotting-in-r-programming/
