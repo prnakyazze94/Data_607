@@ -1,0 +1,122 @@
+---
+title: "Week 2A Pricilla Nakyazze Assignment – SQL and R"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+date: "2025-09-03"
+---
+
+#```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+#```
+
+
+
+```{r}
+library(RSQLite)
+library(DBI)
+library(sqldf)
+library(RODBC)
+library(odbc)
+library(crayon)
+library(dplyr)
+
+```
+
+```{R}
+library(RPostgres)
+```
+
+
+
+
+Choose six recent popular movies. Ask at least five  imaginary
+friends to rate each of these movies that they have seen on a scale of 1 to 5. Take the results
+(observations) and store them in a SQL database of your choosing.Load the information from the SQL database
+into an R dataframe.
+I downloaded the PostgreSQL Ansi driver, and using ODBC data source Administrator created the User DSN Post to access the PGadmin Tables.
+```{r}
+
+
+# Connect to the database
+con <- dbConnect(odbc::odbc(), "Post")
+
+
+# Run your query
+movies2 <- dbGetQuery(con, "SELECT * FROM movietable;")
+
+movies3 <- dbGetQuery(con, "SELECT * FROM MovieID;")
+
+```
+
+```{r}
+dfMovies <- movies2
+dfMovies
+```
+Load the information from the SQL database into an R dataframe.
+
+```{r}
+Movie_detail <- movies3
+Movie_detail
+```
+Handling missing data is a foundational skill when working with SQL or R. To receive full credit, you should
+demonstrate a reasonable approach for handling missing data. After all, how likely is it that all five of your
+friends have seen all six movies?
+
+To calculate the mean of a vector in R that contains missing values (represented as NA), you need to handle them explicitly, or R will return NA by default. You can do this using the na.rm argument.
+
+Using na.rm
+NA demonstration. By Calculating Susan's mean rating.
+
+ The mean calculation for 'Susan' will result in NA because of the missing value in the 'f1_the_movie' column.
+```{r}
+mean_susan_with_na <- mean(c(dfMovies$elio[3], dfMovies$how_to_train_your_dragon[3], dfMovies$f1_the_movie[3], dfMovies$superman[3]))
+print(mean_susan_with_na)
+```
+```{r}
+dfMovies <- dfMovies %>%
+  mutate(across(everything(), ~na_if(., "NA")))
+```
+
+
+ Correctly calculate the mean using na.rm = TRUE
+# The `na.rm = TRUE` argument tells R to remove NA values before computing the mean.
+`
+```{r}
+mean_susan_correct <- mean(
+  as.numeric(c(
+    dfMovies$elio[3],
+    dfMovies$how_to_train_your_dragon[3],
+    dfMovies$f1_the_movie[3],
+    dfMovies$superman[3]
+  )),
+  na.rm = TRUE
+)
+
+print(mean_susan_correct)
+```
+Is there any benefit in standardizing ratings? How might you approach this?
+Z-score standardization (mean = 0, sd = 1)
+
+Its Useful when you want to normalize values so they follow a standard normal distribution. This process, often called Z score normalization, transforms data to have a mean of 0 and a standard deviation of 1. Normalization can help with outlier detection. Values that are significantly far from the mean (e.g., Z-scores above 3 or below -3) are more easily identified as potential outliers.
+
+The superman column has a scaled:scale of 0 and all NaN values. This happened because the original data had no variation. All the ratings were the exact same. Since the standard deviation was zero, the scale() function couldn't perform the division, resulting in NaN (Not a Number) values.
+
+
+```{r}
+# Convert "NA" strings to actual NA values
+dfMovies[dfMovies == "NA"] <- NA
+
+#  Identify numeric columns
+numeric_cols <- sapply(dfMovies, is.numeric)
+
+#  Standardize numeric columns only
+dfMovies_scaled <- dfMovies  # Make a copy
+
+dfMovies_scaled[numeric_cols] <- lapply(dfMovies[numeric_cols], scale)
+```
+
+```{r}
+str(dfMovies_scaled)
+```
