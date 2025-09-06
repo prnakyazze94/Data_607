@@ -1,0 +1,364 @@
+---
+title: "Week 3B Window Functions"
+Due on Sep 14, 2025 11:59 PM"
+author: "Pricilla"
+date: "2025-09-05"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+I used a CSV that I downloaded from https://www.kaggle.com/datasets/sunnykusawa/stock-price-dataset-eod to create a stock_price_data table in PGADMIN. This data is from 2020. It is 1600 rows of stock prices over a duration of 5 months. 
+
+```{r}
+library(RSQLite)
+library(DBI)
+library(sqldf)
+library(RODBC)
+library(odbc)
+library(crayon)
+library(dplyr)
+library(RPostgres)
+library(lubridate)
+library(ggplot2)
+```
+
+1. Find a dataset that includes time series for two or more separate items.  For example, you could use end of day stock or cryptocurrency prices since Jan 1, 2022 for several instruments.
+
+Connected to PgAmin to create Stock_df.
+```{r}
+
+
+# Connect to the database
+con <- dbConnect(odbc::odbc(), "Post")
+
+
+# Run your query
+Stock <- dbGetQuery(con, "SELECT * FROM stock_price_data;")
+
+```
+I will be using the adj_close for my window functions.
+
+```{r}
+stock_df <- Stock
+glimpse(stock_df)
+```
+
+
+
+Used SQL to find Average close cost by the year to see which stock did well.
+```{r}
+YearlyAvg <- dbGetQuery(con, "
+  SELECT
+    symbol,
+    EXTRACT(YEAR FROM date) AS year,
+    AVG(adj_close) AS avg_adj_close
+  FROM stock_price_data
+  GROUP BY symbol, EXTRACT(YEAR FROM date)
+  ORDER BY symbol, year
+")
+```  
+
+```{r}
+glimpse(YearlyAvg)
+```
+```{r}
+# Plot
+ggplot(YearlyAvg, aes(x = reorder(symbol, avg_adj_close), y = avg_adj_close, fill = symbol)) +
+  geom_col() +
+  coord_flip() +  # Flip for easier readability
+  labs(
+    title = "Average Adjusted Close Price by Stock (2020)",
+    x = "Stock Symbol",
+    y = "Average Adjusted Close Price"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+AMAZON AND GOOGLE are the best performing stocks in this dataset.
+
+
+
+2. Use window functions (in SQL ) to calculate the year-to-date average
+```{r}
+WinYrAvg <- dbGetQuery(con, "
+
+SELECT
+    symbol,
+    date,
+    EXTRACT(YEAR FROM date) AS year,
+    adj_close,
+    AVG(adj_close) OVER (
+        PARTITION BY symbol, EXTRACT(YEAR FROM date)
+        ORDER BY date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS ytd_avg_adj_close
+FROM stock_price_data
+")
+```
+
+```{r}
+glimpse(WinYrAvg)
+```
+
+
+```{r}
+
+WinYrAvg %>%
+  filter(symbol %in% c("GOOGL", "AMZN")) %>%
+  group_by(symbol) %>%
+  slice_head(n = 10)
+```
+
+
+The six-day moving averages for each item.. 
+```{r}
+Day6Avg <- dbGetQuery(con, "
+
+SELECT
+    symbol,
+    date,
+    adj_close,
+    AVG(adj_close) OVER (
+        PARTITION BY symbol
+        ORDER BY date
+        ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
+    ) AS day6_adj_close
+FROM stock_price_data
+ORDER BY symbol, date
+")
+```
+
+
+
+
+
+
+
+```{r}
+glimpse(Day6Avg)
+```
+
+```{r}
+Day6Avg %>%
+  filter(symbol %in% c("GOOGL", "AMZN")) %>%
+  group_by(symbol) %>%
+  slice_head(n = 10)
+```
+
+SNAPSHOT OF 6 DAY MOVING AVG FOR AAPL, AMZN & GOOGL.
+
+The 6 day Moving Average Smooths volatility and reduces “noise” from daily price swings.
+
+It helps highlight the general direction (upward/downward) over time.
+
+Traders often use moving averages to identify buy/sell points (e.g., when price crosses the average line).
+
+
+```{r}
+Day6Avg %>%
+  filter(symbol %in% c("AAPL", "AMZN", "GOOGL")) %>%  # Filter for some symbols to keep plot readable
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = adj_close, color = "Adjusted Close")) +
+  geom_line(aes(y = day6_adj_close, color = "6-Day Avg Adj Close")) +
+  facet_wrap(~symbol, scales = "free_y") +
+  labs(
+    title = "Adjusted Close vs 6-Day Average Adjusted Close",
+    y = "Price (USD)",
+    color = "Legend"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+AAPL
+
+The blue and red lines follow each other closely, but you can see when the blue line spikes or dips suddenly, the red line moves more gradually.
+
+AMZN & GOOGL are Similar, smoothing is visible, the red line delays in reacting to sharp blue line movements, making it useful for identifying trends rather than daily changes.
+
+Use window functions (dplyr) to calculate the year-to-date average
+
+```{r}
+YearAVGdf <- stock_df %>%
+  mutate(year = year(date)) %>%        # Extract year from date
+  arrange(symbol, date) %>%            # Ensure proper order for cumulative average
+  group_by(symbol, year) %>%
+  mutate(
+    ytd_avg_adj_close = cummean(adj_close)  # Cumulative average within each symbol-year
+  ) %>%
+  ungroup()
+
+```
+
+
+```{r}
+YearAVGdiff <- stock_df %>%
+  mutate(year = lubridate::year(date)) %>%   # Extract year from date (ensure lubridate is loaded)
+  arrange(symbol, date) %>%                  # Ensure proper order for cumulative average
+  group_by(symbol, year) %>%
+  mutate(
+    ytd_avg_adj_close = cummean(adj_close),  # Cumulative average within each symbol-year
+    diff_from_avg = adj_close - ytd_avg_adj_close  # Difference between actual and average
+  ) %>%
+  ungroup()
+```
+
+
+```{r}
+glimpse(YearAVGdf)
+```
+
+```{r}
+
+YearAVGdf %>%
+  filter(symbol %in% c("GOOGL", "AMZN")) %>%
+  group_by(symbol) %>%
+  slice_head(n = 10)
+```
+
+
+
+```{r}
+YearAVGdf %>%
+  filter(symbol %in% c("GOOGL", "AMZN")) %>%
+  group_by(symbol) %>%
+  slice_head(n = 10) %>%
+  select(symbol, date, adj_close, ytd_avg_adj_close)
+
+```
+
+```{r}
+ggplot(YearAVGdf, aes(x = date)) +
+  geom_line(aes(y = adj_close, color = "Actual Close Price"), size = 1) +
+  geom_line(aes(y = ytd_avg_adj_close, color = "YTD Avg Close"), linetype = "dashed", size = 1) +
+  facet_wrap(~symbol, scales = "free_y") +  # One panel per stock
+  labs(
+    title = "Adjusted Close vs YTD Average Adjusted Close",
+    subtitle = "For AMZN and GOOGL",
+    x = "Date",
+    y = "Price (USD)",
+    color = "Legend"
+  ) +
+  theme_minimal()
+```
+
+Three stock snapshot Explanation
+
+
+AMZN (Amazon)
+
+Red Line (Actual): Shows significant fluctuations with a general upward trend.
+
+Blue Line (YTD Average): Smoothly rises over time, reflecting Amazon's growing performance throughout the year.
+
+The stock had sharp peaks and dips, likely due to market volatility or earnings releases.
+
+Despite volatility, the YTD average increases steadily, suggesting consistent overall growth.
+
+Amazon consistently traded above the YTD average, indicating strong investor confidence.
+
+
+Google
+
+Red Line and Actual: Starts lower and gradually increases with fewer sharp fluctuations compared to AMZN.
+
+Blue Line: Steady linear climb, indicating a healthy and consistent rise in adjusted close prices.
+
+
+GOOGL experienced less volatility than AMZN.
+
+The price often returned to the YTD average, showing alignment between market price and intrinsic valuation.
+
+Late in the year, the actual price diverged above the average signalling a strong bullish signal.
+
+TSLA-Tesla
+
+Red Line Actual price show high volatility with steep increases and dips.
+
+The Blue Line which is YTD is Steady but much lower than the actual price for most of the timeline.
+
+
+Tesla’s stock saw explosive growth, which isn’t matched by the YTD average until late.
+
+The gap between actual price and YTD average indicates rapid, recent price surges.
+
+Ideal example of a high momentum stock with elevated risk.
+
+
+When I Calculate the difference between Average Price and adj_close it makes sense to not time the market in hopes of getting a good deal but to just continue buying stock because for my favorite stock AMZN I am not seeing a significant dip in prices that warrants timing the market for a good deal. 2020-08-18 to 2020-08-24	 would have been a good day to sell because the average Price was high.
+
+
+
+```{r}
+YearAVGdiff %>%
+  filter(symbol %in% c("GOOGL", "AMZN")) %>%
+  group_by(symbol) %>%
+  slice_head(n = 10) %>%
+  select(symbol, date, adj_close, ytd_avg_adj_close, diff_from_avg)
+
+```
+
+```{r}
+# Filter only AMZN and GOOGL
+filtered_df <- YearAVGdiff %>%
+  filter(symbol %in% c("AMZN", "GOOGL"))
+
+# Plot: Actual vs YTD Avg Close
+ggplot(filtered_df, aes(x = date)) +
+  geom_line(aes(y = adj_close, color = "Actual Close Price"), size = 1) +
+  geom_line(aes(y = ytd_avg_adj_close, color = "YTD Avg Close"), size = 1, linetype = "dashed") +
+  facet_wrap(~symbol, scales = "free_y") +
+  labs(
+    title = "Adjusted Close vs YTD Average Close",
+    x = "Date", y = "Price (USD)",
+    color = "Legend"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c("Actual Close Price" = "red", "YTD Avg Close" = "blue"))
+```
+
+
+Plot for how far the actual close was from the YTD average
+This Plot shows the difference between the daily Adjusted Close price and the Year-to-Date (YTD) Average Adjusted Close for two stocks. AMZN (Amazon) and GOOGL over the latter part of 2020.
+
+```{r}
+ggplot(filtered_df, aes(x = date, y = diff_from_avg, fill = symbol)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Difference from YTD Average Adjusted Close",
+    x = "Date", y = "Difference (USD)"
+  ) +
+  facet_wrap(~symbol, scales = "free_y") +
+  theme_minimal()
+```
+
+
+AMZN 
+
+The differences swing widely between +250 and -300 USD showing high volatility.
+
+In early August, AMZN traded above its YTD average.
+
+In late September to mid-October, AMZN consistently traded below the YTD average — suggesting a slump relative to its average performance.
+
+Later, it bounced back but still fluctuated around the YTD average.
+
+
+
+GOOGL 
+
+Google showed a more consistent uptrend compared to AMZN.
+
+After some minor dips in August and September, GOOGL showed mostly positive differences. Closing well above its YTD average for most of November and December.
+
+This suggests strong, steady performance in the second half of the year.
+```{r cleanup, include=FALSE}
+dbDisconnect(con)
+```
