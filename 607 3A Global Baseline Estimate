@@ -1,0 +1,390 @@
+---
+title: "607 3A Global Baseline Estimates"
+author: "Pricilla"
+date: "2025-09-07"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+A global baseline is a simple standard perfomance model used to establish a point of reference for an entire project. For example for a Movie recommendation system, a simple model can recommend the most popular movie to every user.
+
+A global baseline estimate is calculated by Estimate = Overall Average + user Bias + Item Bias.
+
+For example 
+          If the Overall Average rating of all movies by all users is 3.5,
+          and  User A typically rates movies 0.5 higher than the overall average,
+         and item Bias of movie_b is 0.3.
+  The predicated rating for Movie_b by user A is 3.5+0.5+(-3)= 3.7 
+
+```{r libraries}
+library(tidyverse)
+library(dplyr)
+library(readr)
+```
+##1.1 Load the Movie Ratings data into data frame and preview 
+```{r}
+Movie_Ratings <- read_csv("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/MovieRatings1.csv")
+glimpse(Movie_Ratings)
+```
+PIVOT DATA AND REMOVE MISSING RATINGS
+
+```{r}
+# Pivot data to long format
+ratings_long <- Movie_Ratings %>%
+  pivot_longer(cols = -Critic, names_to = "movie", values_to = "rating") %>%
+  filter(!is.na(rating))  # Remove missing ratings
+```
+
+Compute movie averages and movie bias
+
+
+# === Bias Terms ===
+global_mean — the overall average
+
+user_bias — from the user_bias data frame
+
+movie_bias — from the movie_stats data frame
+
+
+```{r}
+# Compute global mean rating
+global_mean <- mean(ratings_long$rating, na.rm = TRUE)
+
+# Compute user bias
+user_bias <- ratings_long %>%
+  group_by(Critic) %>%
+  summarise(user_avg = mean(rating, na.rm = TRUE)) %>%
+  mutate(
+    user_bias = round(user_avg - global_mean, 2),
+    user_avg = round(user_avg, 2)
+  )
+
+# Compute movie stats including bias
+movie_stats <- ratings_long %>%
+  group_by(movie) %>%
+  summarise(movie_avg = mean(rating, na.rm = TRUE)) %>%
+  mutate(
+    movie_bias = round(movie_avg - global_mean, 2),
+    movie_avg = round(movie_avg, 2)
+  )
+
+# Print both tables
+#print(movie_stats)
+print(user_bias)
+
+```
+USER RATING AND USER BIAS
+
+These statistics show how each critic (user) rated movies on average, and how their ratings differed from the global average across all users and movies.
+
+Xingjia has the highest positive user_bias he rates movies higher than the average critic. With a user average of 5 and user bias of 1.07
+Matt rates lower than the average ratings at 3.25.
+
+
+PLOT OF AVERAGE USER RATING AND user BIAS
+
+```{r}
+ggplot(user_bias, aes(x = reorder(Critic, user_avg), y = user_avg)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(
+    aes(label = sprintf("%.2f", user_bias)),
+    color = "white",
+    size = 4.5,         # Slightly smaller size for fitting
+    fontface = "bold",
+    vjust = 0.5,        # Center vertically inside bar
+    hjust = 1.1         # Push text slightly left inside bar (for horizontal bars)
+  ) +
+  labs(
+    title = "User Average Ratings and User Bias",
+    x = "Critic",
+    y = "Average Rating"
+  ) +
+  coord_flip() +
+  theme_minimal(base_size = 13)
+```
+MOVIE RATINGS AND ITEM BIAS
+
+PitchPerfect2 has an average rating of 2.71 which is the lowest rated movie.–1.22 is a significant negative bias meaning viewers rated it far below average and indicating it's consistently less liked.
+
+Deadpool with an average rating of 4.44 is the highest rated movie in the data set.
+
+A bias of +0.51 indicates it was rated much higher than average.
+```{r}
+print(movie_stats)
+```
+AVERAGE MOVIE RATING AND ITEM BIAS PLOT
+
+```{r}
+ggplot(movie_stats, aes(x = reorder(movie, -movie_avg), y = movie_avg)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = movie_bias), 
+            color = "white", 
+            size = 4, 
+            vjust = 1.5) +  # Push text inside the bar
+  labs(
+    title = "Average Movie Ratings with Item Bias",
+    x = "Movie",
+    y = "Average Rating"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+
+How would Param rate Pitch Perfect 2?
+
+Param is predicted to rate PitchPerfect2 with a 2.28 rating.
+```{r}
+# Extract Param's user bias (make sure it's a scalar)
+param_bias <- user_bias[user_bias$Critic == "Param", "user_bias"][[1]]
+
+# Extract PitchPerfect2's movie bias
+pitchperfect2_bias <- movie_stats[movie_stats$movie == "PitchPerfect2", "movie_bias"][[1]]
+
+# Predict the rating
+predicted_rating <- global_mean + param_bias + pitchperfect2_bias
+
+# Print
+print(round(predicted_rating, 2))
+```
+
+``
+
+
+All possiple predictions
+```{r}
+# Create all user-movie combinations and calculate predicted rating
+predicted_ratings <- expand.grid(Critic = user_bias$Critic, movie = movie_stats$movie) %>%
+  left_join(user_bias %>% select(Critic, user_bias), by = "Critic") %>%
+  left_join(movie_stats %>% select(movie, movie_bias), by = "movie") %>%
+  mutate(
+    predicted_rating = round(global_mean + user_bias + movie_bias, 2)
+  ) %>%
+  select(Critic, movie, predicted_rating)
+
+# Convert from long to wide format
+predicted_wide <- predicted_ratings %>%
+  pivot_wider(names_from = movie, values_from = predicted_rating)
+
+# Print wide format table
+print(predicted_wide)
+
+
+
+```
+
+
+
+
+
+
+Find the movie that Param would rate the highest
+```{r}
+param_predictions <- predicted_wide %>%
+  filter(Critic == "Param") %>%
+  select(-Critic)
+
+# Find the highest predicted rating and corresponding movie(s)
+max_rating <- max(param_predictions)
+top_movies <- names(param_predictions)[which(param_predictions == max_rating)]
+
+# Print result
+
+print(top_movies)
+```
+
+
+
+
+Based on Predications what is the most higly rated movie
+```{r}
+# Calculate average predicted rating per movie
+avg_predicted_ratings <- predicted_ratings %>%
+  group_by(movie) %>%
+  summarise(avg_rating = round(mean(predicted_rating), 2)) %>%
+  arrange(desc(avg_rating))
+
+# Most highly rated movie
+most_highly_rated_movie <- avg_predicted_ratings %>%
+  slice(1)
+
+print(most_highly_rated_movie)
+```
+
+
+Based on Actual data what is the most highly rated movie
+```{r}
+avg_actual_ratings <- ratings_long %>%
+  group_by(movie) %>%
+  summarise(avg_rating = round(mean(rating), 2)) %>%
+  arrange(desc(avg_rating))
+
+most_highly_rated_movie_actual <- avg_actual_ratings %>%
+  slice(1)
+
+print(most_highly_rated_movie_actual)
+```
+
+
+
+```{r}
+library(RSQLite)
+library(DBI)
+library(sqldf)
+library(RODBC)
+library(odbc)
+library(crayon)
+library(dplyr)
+
+```
+
+```{R}
+library(RPostgres)
+```
+
+
+
+
+Using my Assignment 2A TABLE TO PREDICT RATINGS
+
+FIRST ESTABLISH A CONNECTION TO PGADMIN
+```{r}
+
+
+# Connect to the database
+con <- dbConnect(odbc::odbc(), "Post")
+
+
+# Run your query
+movies2 <- dbGetQuery(con, "SELECT * FROM movietable;")
+
+movies3 <- dbGetQuery(con, "SELECT * FROM MovieID;")
+print(movies2)
+```
+
+
+
+
+Now pivot to long format, keeping NA v
+```{r}
+ratings_2A <- movies2 %>%
+  pivot_longer(
+    cols = -film,              # All other columns are viewer names
+    names_to = "viewer",        # New column: who rated
+    values_to = "rate"        # New column: what rating
+  ) %>%
+  filter(!is.na(rate))        # remove NA
+
+# Preview
+print(ratings_2A)
+```
+
+Calculating Estimate = Overall Average + user Bias + Item Bias.for my Assignment 2A data.
+COMPUTE Overall average rating
+        Movie bias 
+        user bias
+
+```{r}
+# Compute global mean rating
+global_avg <- mean(ratings_2A$rate, na.rm = TRUE)
+
+# Compute viewer bias
+viewer_bias <- ratings_2A %>%
+  group_by(viewer) %>%
+  summarise(viewer_avg = mean(rate, na.rm = TRUE)) %>%
+  mutate(
+    viewer_bias = round(viewer_avg - global_avg, 2),
+    viewer_avg = round(viewer_avg, 2)
+  )
+
+
+# Compute film stats including bias
+film_stat <- ratings_2A %>%
+  group_by(film) %>%
+  summarise(film_avg = mean(rate, na.rm = TRUE)) %>%
+  mutate(
+    film_bias = round(film_avg - global_avg, 2),
+    film_avg = round(film_avg, 2)
+  )
+
+# Print viewer bias
+print(viewer_bias)
+```
+```{r}
+print(film_stat)
+```
+```{r}
+print(global_avg)
+```
+
+ Create all viewer movie combinations and calculate predicted rating
+```{r}
+predicted_rate <- expand.grid(viewer = viewer_bias$viewer, film = film_stat$film) %>%
+  left_join(viewer_bias %>% select(viewer, viewer_bias), by = "viewer") %>%
+  left_join(film_stat %>% select(film, film_bias), by = "film") %>%
+  mutate(
+    predicted_rate = round(global_avg + viewer_bias + film_bias, 2)
+  ) %>%
+  select(viewer, film, predicted_rate)
+
+# Convert from long to wide format
+predicted_m <- predicted_rate %>%
+  pivot_wider(names_from = film, values_from = predicted_rate)
+
+# Print wide format table
+print(predicted_m)
+```
+
+
+Top Recommendation for Susan
+```{r}
+# Extract predicted ratings for Susan
+susan_predictions <- predicted_m %>%
+  filter(viewer == "susan") %>%
+  select(-viewer)  # Remove viewer name to focus on movies
+
+# Find the max predicted rating
+max_rating <- max(susan_predictions, na.rm = TRUE)
+
+# Get the movie(s) with that max rating
+top_movie <- names(susan_predictions)[which(susan_predictions == max_rating)]
+
+# Print the result
+
+print(top_movie)
+
+```
+
+Get Susan’s Predicted Rating for F1 the movie
+```{r}
+# Get Susan's predicted rating for "F1 the movie"
+susan_f1_rating <- predicted_rate %>%
+  filter(viewer == "susan", film == "F1 the movie")
+
+# Print result
+cat("Susan's predicted rating for 'F1 the movie' is:\n")
+print(susan_f1_rating$predicted_rate)
+
+```
+
+Movie with lowest predicated Rating
+
+```{r}
+# Find the minimum predicted rating in the full dataset
+min_rating <- min(predicted_rate$predicted_rate, na.rm = TRUE)
+
+# Find the viewer-movie pair(s) with that minimum rating
+lowest_predictions <- predicted_rate %>%
+  filter(predicted_rate == min_rating)
+
+# Print result
+print(lowest_predictions)
+```
