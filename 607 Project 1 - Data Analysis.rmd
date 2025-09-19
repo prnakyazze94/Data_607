@@ -1,0 +1,266 @@
+---
+title: "607 Project 1 - Data Analysis"
+author: "Pricilla"
+date: "2025-09-10"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(knitr)
+library(ggplot2)
+library(forcats)
+library(dplyr)
+```
+
+In this project, you’re given a text file with chess tournament results where the information has some structure. Your
+job is to create an R Markdown file that generates a .CSV file (that could for example be imported into a SQL database)
+with the following information for all of the players:
+
+
+Load Tournament.txt from Github
+
+https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt
+
+```{r}
+# Read the file
+lines <- readLines("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt")
+print(lines)
+```
+
+
+Filter only player lines information.
+```{r}
+# Remove separator lines and blank lines
+lines <- lines[!grepl("^-+|^\\s*$", lines)]
+
+# Remove the two header lines
+lines <- lines[-c(1, 2)]
+
+# Separate into player + info lines
+player_lines <- lines[seq(1, length(lines), by = 2)]
+info_lines <- lines[seq(2, length(lines), by = 2)]
+```
+
+create df
+```{r}
+results <- data.frame(
+  PairNum = integer(),
+  Name = character(),
+  State = character(),
+  USCF_ID = character(),
+  PreRating = numeric(),
+  PostRating = numeric(),
+  TotalScore = numeric(),
+  stringsAsFactors = FALSE
+)
+```
+
+Player’s Name, Player’s State, Total Number of Points, Player’s Pre-Rating, and Average Pre Chess Rating of Opponents
+For the first player, the information would be:
+Gary Hua, ON, 6.0, 1794, 1605
+
+Extract all Player information, calculate Average(mean) and Prepare output data frame
+```{r}
+
+
+# Extract all pre-ratings once (used for AvgOpponentRating)
+pre_ratings <- sapply(info_lines, function(info) {
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  as.integer(gsub("R:\\s*", "", rating_match))
+})
+
+# Prepare output data frame
+output <- data.frame(
+  Player = character(),
+  State = character(),
+  Points = numeric(),
+  PreRating = integer(),
+  AvgOpponentRating = numeric(),
+  PlayerNum = integer(),
+  OpponentNums = character(),
+  OpponentPreRatings = character(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through players
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract clean player name (remove leading number and pipe)
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract points
+  points_match <- regmatches(pl, regexpr("\\|\\s*[0-9]+\\.?[0-9]*\\s*\\|", pl))
+  points <- as.numeric(gsub("[^0-9.]", "", points_match))
+
+  # Extract state (e.g., ON, MI)
+  state_match <- regmatches(info, regexpr("\\b[A-Z]{2}\\b", info))
+  state <- if (length(state_match) > 0) state_match else NA
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- as.integer(gsub("R:\\s*", "", rating_match))
+
+  # Extract opponent indices from line 1 (rounds)
+  rounds <- unlist(strsplit(pl, "\\|"))
+  rounds <- rounds[4:length(rounds)]  # skip first 3 parts
+  opp_indices <- as.integer(gsub("[^0-9]", "", rounds))
+  opp_indices <- opp_indices[!is.na(opp_indices)]
+
+  # Calculate average opponent rating
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+  } else {
+    avg_opp_rating <- NA
+  }
+
+  # Add row to output
+  output <- rbind(output, data.frame(
+    Player = name,
+    State = state,
+    Points = points,
+    PreRating = pre_rating,
+    AvgOpponentRating = avg_opp_rating,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# View output
+print(output)
+
+# save to CSV
+write.csv(output, "tournament_results.csv", row.names = FALSE)
+
+```
+
+
+Create an output2 DF with the player Num, player's PreRTG, Opponent Nums, Opponent's PreRTG and  Average Opponent Rating.
+
+```{r}
+# Create output data frame with player num and Opponent's rating and Opponents Num and Avg colm
+output2 <- data.frame(
+  PlayerNum = integer(),
+  Player = character(),
+  PreRating = integer(),
+  OpponentNums = character(),
+  OpponentPreRatings = character(),
+  AvgOpponentRating = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Extract all pre-ratings once
+pre_ratings <- sapply(info_lines, function(info) {
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  as.integer(gsub("R:\\s*", "", rating_match))
+})
+
+# Loop through each player
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract player number
+  player_num <- as.integer(substr(pl, 1, 4))
+
+  # Extract player name
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- as.integer(gsub("R:\\s*", "", rating_match))
+
+  # Extract opponent indices (from rounds)
+  rounds <- unlist(strsplit(pl, "\\|"))
+  rounds <- rounds[4:length(rounds)]  # Skip name, points, etc.
+  opp_indices <- as.integer(gsub("[^0-9]", "", rounds))
+  opp_indices <- opp_indices[!is.na(opp_indices)]
+
+  # Get opponent pre-ratings
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+  } else {
+    opp_ratings <- NA
+    avg_opp_rating <- NA
+  }
+
+  # Add row to output
+  output2 <- rbind(output2, data.frame(
+    PlayerNum = player_num,
+    Player = name,
+    PreRating = pre_rating,
+    OpponentNums = paste(opp_indices, collapse = ", "),
+    OpponentPreRatings = paste(opp_ratings, collapse = ", "),
+    AvgOpponentRating = avg_opp_rating,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# View the output
+kable(output2)
+```
+
+```{r}
+kable(output2[, c("Player", "OpponentNums", "AvgOpponentRating")])
+```
+
+```{r}
+kable(output2[, c("Player", "OpponentPreRatings", "AvgOpponentRating")])
+#print(output[, c("Player", "OpponentPreRatings", "AvgOpponentRating")])
+```
+
+
+
+
+
+Plot top 5 and bottom 5 players based on Average Opponent Rating.
+```{r}
+
+# Get top 5 and bottom 5 by AvgOpponentRating
+top5 <- output[order(-output$AvgOpponentRating), ][1:5, ]
+bottom5 <- output[order(output$AvgOpponentRating), ][1:5, ]
+
+# Combine top and bottom
+subset_output <- rbind(top5, bottom5)
+
+# Reorder factor levels for plotting
+subset_output$Player <- factor(subset_output$Player, levels = subset_output$Player[order(subset_output$AvgOpponentRating)])
+
+
+# Plot
+ggplot(subset_output, aes(x = Player, y = AvgOpponentRating)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = PreRating), 
+            hjust = 1.1,    # move text inside bar, aligned right
+            size = 3.5, 
+            color = "white") +  # white text inside bar
+  coord_flip() +  # Horizontal bars
+  labs(
+    title = "Top 5 and Bottom 5 Players by Average Opponent Rating",
+    x = "Player",
+    y = "Average Opponent Rating"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.y = element_text(size = 9),
+    plot.title = element_text(size = 14, face = "bold")
+  ) +
+  ylim(0, max(subset_output$AvgOpponentRating, na.rm = TRUE) + 100)
+```
+
+Gary Hua faced the strongest opponents, with an average opponent rating of 1605, followed closely by Patrick H. Schilling, who also competed against highly rated players. Both of these players encountered consistently tough competition.
+
+In contrast, Derek Yan, Robert Glen Vasey, and Jared Ge faced weaker opponents on average, with much lower ratings compared to the top group.
+
+This highlights an important insight: a strong player (high PreRating) might have an easier path if matched against weaker opponents, while a lower-rated player could face tougher challenges if paired against stronger opponents. This makes Average Opponent Rating a valuable measure of the difficulty level each player experienced.
+
+For example, Anvit Rao entered with a PreRating of 1365, which is relatively low compared to others in the top group. Yet, his Average Opponent Rating of about 1554 shows that he was consistently paired against players who were significantly stronger than him on paper.
