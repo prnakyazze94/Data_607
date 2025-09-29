@@ -1,0 +1,482 @@
+---
+title: "Elo Calculations"
+author: "Pricilla"
+date: "2025-09-25"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(knitr)
+library(ggplot2)
+library(forcats)
+library(dplyr)
+library(stringr)
+```
+
+To compute each player’s expected score and the difference vs actual, we use the Elo expected score formula for each game:
+
+The formula I am using comes directly from Arpad Elo’s original rating system, which was introduced in the 1960s to improve the older chess rating methods used by the US Chess Federation (USCF). Later, FIDE (the international chess federation) formally adopted it in 1970 as the official system for international chess ratings.
+
+
+In this chess tournament dataset, the Elo calculation is based on two key columns:
+
+- **PreRating** → the player’s rating before the tournament.  
+- **AvgOpponentRating** → the average rating of all the opponents that player faced.  
+
+The Elo expected score formula is:
+
+$$
+E = \frac{1}{1 + 10^{\frac{(R_{opp} - R_{player})}{400}}}
+$$
+
+Where:  
+
+- \(R_{player}\) = the player’s **PreRating**  
+- \(R_{opp}\) = the **AvgOpponentRating**  
+
+This gives the expected score for each player in the tournament.Returns a value between 0 and 1, representing the expected fraction of points in one game.
+
+---
+
+Then the new rating is updated after comparing the actual score (from **Points**) vs the expected score \(E\):
+
+$$
+R_{new} = R_{old} + K \times (S - E)
+$$
+
+Where:  
+
+- \(R_{old}\) = PreRating  
+- \(S\) = actual score (from Points)  
+- \(E\) = expected score (from formula above)  
+- \(K\) = development factor (often 32, 24, or 16 depending on federation and rating level).  
+
+---
+
+So in this dataset:  
+
+- **PreRating** and **AvgOpponentRating** are the inputs for expected Elo calculation.  
+- **Points** (tournament score) is compared against the expected score to determine how the player’s rating should adjust.  
+
+
+"Gary Hua Elo Calculation Step by Step"
+
+
+
+
+- **Actual Points:** \(S = 6.0\)  
+- **PreRating:** \(R_{\text{player}} = 1794\)  
+- **Avg Opponent Rating:** \(R_{\text{opp}} = 1605\)  
+- **K-factor:** \(K = 32\) (typical)
+
+---
+
+Compute Expected Score
+
+The Elo expected score formula:
+
+\[
+E = \frac{1}{1 + 10^{\frac{R_{\text{opp}} - R_{\text{player}}}{400}}}
+\]
+
+Substitute Gary’s values:
+
+\[
+E = \frac{1}{1 + 10^{\frac{1605 - 1794}{400}}}
+\]
+
+Compute the exponent first:
+
+\[
+1605 - 1794 = -189
+\]
+
+\[
+\frac{-189}{400} = -0.4725
+\]
+
+Then:
+
+\[
+10^{-0.4725} \approx 0.336
+\]
+
+\[
+1 + 0.336 = 1.336
+\]
+
+\[
+E = \frac{1}{1.336} \approx 0.748
+\]
+
+ This is the expected score per game against a 1605 rated opponent.
+ Returns a value between 0 and 1, representing the expected fraction of points in one game.
+ 
+ 
+
+
+Scale to Tournament Points
+
+Assuming 7 rounds in the tournament:
+
+\[
+\text{Expected Points} \approx 0.748 \times 7 \approx 5.24
+\]
+
+ Elo expects Gary to score about 5.24 points.
+
+---
+
+Compute Difference vs Actual
+
+\[
+\text{Diff} = \text{Actual Points} - \text{Expected Points}
+\]
+
+\[
+\text{Diff} = 6.0 - 5.2 = 0.8
+\]
+
+ Gary slightly outperformed
+
+
+Load Tournament.txt from Github
+
+https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt
+
+```{r}
+# Read the file
+lines <- readLines("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt")
+
+```
+
+
+Filter only player lines information.
+```{r}
+# Remove separator lines and blank lines
+lines <- lines[!grepl("^-+|^\\s*$", lines)]
+
+# Remove the two header lines
+lines <- lines[-c(1, 2)]
+
+# Separate into player + info lines
+player_lines <- lines[seq(1, length(lines), by = 2)]
+info_lines <- lines[seq(2, length(lines), by = 2)]
+```
+
+create df
+```{r}
+results <- data.frame(
+  PairNum = integer(),
+  Name = character(),
+  State = character(),
+  USCF_ID = character(),
+  PreRating = numeric(),
+  PostRating = numeric(),
+  TotalScore = numeric(),
+  stringsAsFactors = FALSE
+)
+```
+
+
+
+Extract all Player information, PreRating, Points, State, OpponentNums,  OpponentPreRatings calculate Average(mean) and Prepare output data frame
+
+
+```{r}
+# Extract all pre-ratings once (used for AvgOpponentRating)
+pre_ratings <- sapply(info_lines, function(info) {
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  as.integer(gsub("R:\\s*", "", rating_match))
+})
+
+# Prepare output data frame
+output <- data.frame(
+  Player = character(),
+  State = character(),
+  Points = numeric(),
+  PreRating = integer(),
+  AvgOpponentRating = numeric(),
+  PlayerNum = integer(),
+  OpponentNums = character(),
+  OpponentPreRatings = character(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through players
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract clean player name (remove leading number and pipe)
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract points
+  points_match <- regmatches(pl, regexpr("\\|\\s*[0-9]+\\.?[0-9]*\\s*\\|", pl))
+  points <- as.numeric(gsub("[^0-9.]", "", points_match))
+
+  # Extract state (e.g., ON, MI)
+  state_match <- regmatches(info, regexpr("\\b[A-Z]{2}\\b", info))
+  state <- if (length(state_match) > 0) state_match else NA
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- as.integer(gsub("R:\\s*", "", rating_match))
+
+  # Extract opponent indices from line 1 (rounds)
+  rounds <- unlist(strsplit(pl, "\\|"))
+  rounds <- rounds[4:length(rounds)]  # skip first 3 parts
+  opp_indices <- as.integer(gsub("[^0-9]", "", rounds))
+  opp_indices <- opp_indices[!is.na(opp_indices)]
+
+  # Calculate average opponent rating
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+  } else {
+    avg_opp_rating <- NA
+  }
+
+  # Add row to output
+  output <- rbind(output, data.frame(
+    Player = name,
+    State = state,
+    Points = points,
+    PreRating = pre_rating,
+    AvgOpponentRating = avg_opp_rating,
+    stringsAsFactors = FALSE
+  ))
+}
+
+p <- 10
+
+# Print only the first p rows
+print(head(output, n = p))
+# View output
+#print(output)
+
+```
+
+
+
+
+
+
+
+
+
+
+calculate each player’s expected score (e.g. 4.3) and the difference from their actual score (e.g 4.0)
+
+```{r}
+# --- Function to compute expected score for one game ---
+elo_expect <- function(r_player, r_opp) {
+  1 / (1 + 10 ^ ((r_opp - r_player) / 400))
+}
+
+# --- Prepare an output frame with consistent columns ---
+output <- data.frame(
+  Player = character(),
+  Points = numeric(),
+  PreRating = integer(),
+  AvgOpponentRating = numeric(),
+  ExpectedPoints = numeric(),
+  Diff = numeric(),
+  NewRating = numeric(),
+  stringsAsFactors = FALSE
+)
+
+n_players <- length(pre_ratings)  # assumes pre_ratings exists
+K <- 32  # You can adjust this value depending on federation rules
+
+# --- Loop through each player ---
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract player name
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract points
+  points_match <- regmatches(pl, regexpr("\\|\\s*[0-9]+\\.?[0-9]*\\s*\\|", pl))
+  points <- as.numeric(gsub("[^0-9.]", "", points_match))
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- if (length(rating_match) > 0) as.integer(gsub("R:\\s*", "", rating_match)) else NA
+
+  # Extract opponent indices from round columns
+  rounds <- unlist(strsplit(pl, "\\|"))
+  if (length(rounds) >= 4) {
+    rounds <- rounds[4:length(rounds)]
+    opp_indices <- as.integer(str_extract(rounds, "\\d+"))
+    opp_indices <- opp_indices[!is.na(opp_indices)]
+    opp_indices <- opp_indices[opp_indices >= 1 & opp_indices <= n_players]
+  } else {
+    opp_indices <- integer(0)
+  }
+
+  # Compute average opponent rating and expected score
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+    exp_per_game <- elo_expect(pre_rating, opp_ratings)
+    expected_points <- sum(exp_per_game, na.rm = TRUE)
+  } else {
+    avg_opp_rating <- NA
+    expected_points <- NA
+  }
+   #Difference vs Actual Score
+  diff_points <- if (!is.na(expected_points)) points - expected_points else NA
+
+  # --- New Elo Rating calculation
+  new_rating <- if (!is.na(expected_points)) {
+    pre_rating + K * (points - expected_points)
+  } else {
+    NA
+  }
+
+  # Append to output dataframe
+  output <- rbind(output, data.frame(
+    Player = name,
+    Points = points,
+    PreRating = pre_rating,
+    AvgOpponentRating = avg_opp_rating,
+    ExpectedPoints = expected_points,
+    Diff = diff_points,
+    NewRating = new_rating,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# --- Rounding & formatting ---
+output <- output %>%
+  mutate(
+    ExpectedPoints = round(ExpectedPoints, 1),
+    Diff = round(Diff, 2),
+    NewRating = round(NewRating, 0)
+  )
+```
+
+
+```{r}
+final_output <- output %>%
+  select(Player, Points, ExpectedPoints, Diff, PreRating, AvgOpponentRating, NewRating)
+
+#print(final_output)
+kable(
+  final_output,
+  caption = "Tournament Results with Elo Expected Points and Updated Ratings",
+  align = "lcccccc"
+)
+```
+
+
+
+
+Top 5 overperformers
+```{r}
+# Top 5 overperformers
+
+kable((output %>%
+        arrange(desc(Diff)) %>%
+        slice_head(n = 5) %>%
+        select(Player, Points, ExpectedPoints, Diff, PreRating, NewRating, AvgOpponentRating,)))
+```
+
+Aditya’s PreRating is 1384.
+
+His Opponents averaged 1564, which is 180 points higher.
+
+Elo predicts Aditya should lose most games, his expected score is 1.9 points.  But he actually scored 6 points beating much stronger players.
+
+As a result, Elo rewarded him with +130 rating points, bringing his new prerating to 1514.
+
+PLOT TO VISUALLY SHOW ELO TOP PERFORMERS
+```{r}
+top5 <- output %>%
+  arrange(desc(Diff)) %>%
+  slice_head(n = 5) %>%
+  select(Player, Points, ExpectedPoints, Diff, PreRating, NewRating, AvgOpponentRating)
+
+# Plot: Actual vs Expected Points with Diff labels
+ggplot(top5, aes(x = reorder(Player, -Diff))) +
+  geom_col(aes(y = Points, fill = "Actual Points"), width = 0.6) +
+  geom_line(aes(y = ExpectedPoints, group = 1, color = "Expected Points"), size = 1) +
+  geom_point(aes(y = ExpectedPoints, color = "Expected Points"), size = 3) +
+  geom_text(aes(y = Points + 0.2, label = paste0("Diff=", round(Diff, 2))),
+            vjust = 0, size = 3.5) +
+  scale_fill_manual("", values = c("Actual Points" = "orange")) +
+  scale_color_manual("", values = c("Expected Points" = "red")) +
+  labs(title = "Top 5 Elo Overperformers",
+       x = "Player", y = "Points") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+You can see that all these players scored well above Elo expectations, which explains why each of them gained rating points.
+
+All five players in this plot overperformed relative to Elo.
+
+The red “expected” line sits much lower than the orange bars, this visual gap highlights how much each exceeded expectations.
+
+These players see big Elo rating gains after the tournament.
+
+The biggest standout is Aditya Bajaj, with over 4 points more than expected.
+
+
+
+
+5 TOP UNDER PERFORMERS
+```{r}
+# Top 5 underperformers
+
+kable((output %>%
+        arrange(Diff) %>%
+        slice_head(n = 5) %>%
+        select(Player, Points, ExpectedPoints, Diff, PreRating, NewRating, AvgOpponentRating,)))
+```
+
+LOREN SCHWIEBERT's PreRating is 1745 which suggests Loren was much stronger than his opponents with a 1363 averageopponents preRating.
+
+Elo expected him to dominate 6.3 points.
+
+But he only scored 3.5.
+
+Therefore, Elo deducted about 89 rating points, giving him a NewRating of 1656  which better reflects his actual tournament strength.
+
+PLOT TO VISUALLY SHOW ELO TOP UNDER PERFORMERS
+```{r}
+lower5 <- output %>%
+        arrange(Diff) %>%
+        slice_head(n = 5) %>%
+        select(Player, Points, ExpectedPoints, Diff, PreRating, NewRating, AvgOpponentRating)
+
+
+
+# Plot: Actual vs Expected Points with Diff labels
+ggplot(lower5, aes(x = reorder(Player, -Diff))) +
+  geom_col(aes(y = Points, fill = "Actual Points"), width = 0.6) +
+  geom_line(aes(y = ExpectedPoints, group = 1, color = "Expected Points"), size = 1) +
+  geom_point(aes(y = ExpectedPoints, color = "Expected Points"), size = 3) +
+  geom_text(aes(y = Points + 0.2, label = paste0("Diff=", round(Diff, 2))),
+            vjust = 0, size = 3.5) +
+  scale_fill_manual("", values = c("Actual Points" = "orange")) +
+  scale_color_manual("", values = c("Expected Points" = "red")) +
+  labs(title = "Top 5 Elo Underperformers",
+       x = "Player", y = "Points") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+The red “expected” line sits much higher above the orange bars, this visual gap highlights how much each player did not meet expectations.
+
+These players see big Elo rating gains after the tournament.
+
+The biggest standout is LOREN SCHWIEBERT, with 2.78 points less than expected.
+
