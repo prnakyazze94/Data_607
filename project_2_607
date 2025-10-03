@@ -1,0 +1,589 @@
+---
+title: "607 – Project 2"
+author: "Pricilla"
+date: "2025-09-29"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load required libraries
+library(readr)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(ggplot2)
+library(forcats)
+```
+
+Data transformation is an important step in any data analysis process that involves the conversion, cleaning, and organizing of data into accessible formats. It ensures that the information is accessible, consistent, secure, and finally recognized by the intended business users. This process is undertaken by organizations to utilize their data to generate timely business insights and support decision-making processes.
+
+(1) Choose any three of the “wide” datasets 
+
+Create a .CSV file (or optionally, a MySQL database!) that includes all of the information
+included in the dataset. You’re encouraged to use a “wide” structure similar to how the
+information appears in the discussion item, so that you can practice tidying and
+transformations as described below
+
+
+ 
+ 1. Tournament Data
+
+The tournament dataset contained alternating lines of player information and game details. It was in a wide format where each player’s rounds were listed across a single row. To analyze performance, we tidied the data to extract each player's points, pre-rating, opponents, and average opponent rating. This allows us to calculate expected scores using the Elo rating formula and identify overperformers and underperformers.
+ 
+ 
+ 
+ 
+ 
+ Load Tournament.txt from Github
+
+https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt
+Data Cleanup
+
+Removed headers and separator lines.
+
+Split lines into player lines and info lines.
+
+Extracted player names, states, pre-ratings, points, and opponent indices.
+
+Calculated each player’s average opponent rating and rounds played.
+
+Computed expected scores using the Elo formula.
+Calculated performance difference: Diff = Points - Expected.
+
+```{r}
+# Read the file
+lines <- readLines("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Class%20Tournament.txt")
+head(lines)
+```
+
+Filter only player lines information.
+```{r}
+# Remove separator lines and blank lines
+lines <- lines[!grepl("^-+|^\\s*$", lines)]
+
+# Remove the two header lines
+lines <- lines[-c(1, 2)]
+
+# Separate into player + info lines
+player_lines <- lines[seq(1, length(lines), by = 2)]
+info_lines <- lines[seq(2, length(lines), by = 2)]
+```
+
+create df results
+
+This is a raw extraction table.
+
+It holds directly parsed player info from the tournament text file.
+```{r}
+results <- data.frame(
+  PairNum = integer(),
+  Name = character(),
+  State = character(),
+  USCF_ID = character(),
+  PreRating = numeric(),
+  PostRating = numeric(),
+  TotalScore = numeric(),
+  stringsAsFactors = FALSE
+)
+```
+
+
+Read the information from your .CSV file into R, and use tidyr and dplyr as needed to
+tidy and transform your data. 
+
+Extract all Player information from text,Prepare output data frame and save it in tournament_results.csv. Output us the processed/analysis table.
+
+It summarizes each player’s performance and adds derived fields  AvgOpponentRating.
+```{r}
+
+
+# Extract all pre-ratings once (used for AvgOpponentRating)
+pre_ratings <- sapply(info_lines, function(info) {
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  as.integer(gsub("R:\\s*", "", rating_match))
+})
+
+# Prepare output data frame
+output <- data.frame(
+  Player = character(),
+  State = character(),
+  Points = numeric(),
+  PreRating = integer(),
+  AvgOpponentRating = numeric(),
+  PlayerNum = integer(),
+  OpponentNums = character(),
+  OpponentPreRatings = character(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through players
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract clean player name (remove leading number and pipe)
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract points
+  points_match <- regmatches(pl, regexpr("\\|\\s*[0-9]+\\.?[0-9]*\\s*\\|", pl))
+  points <- as.numeric(gsub("[^0-9.]", "", points_match))
+
+  # Extract state (e.g., ON, MI)
+  state_match <- regmatches(info, regexpr("\\b[A-Z]{2}\\b", info))
+  state <- if (length(state_match) > 0) state_match else NA
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- as.integer(gsub("R:\\s*", "", rating_match))
+
+  # Extract opponent indices from line 1 (rounds)
+  rounds <- unlist(strsplit(pl, "\\|"))
+  rounds <- rounds[4:length(rounds)]  # skip first 3 parts
+  opp_indices <- as.integer(gsub("[^0-9]", "", rounds))
+  opp_indices <- opp_indices[!is.na(opp_indices)]
+
+  # Calculate average opponent rating
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+  } else {
+    avg_opp_rating <- NA
+  }
+
+  # Add row to output
+  output <- rbind(output, data.frame(
+    Player = name,
+    State = state,
+    Points = points,
+    PreRating = pre_rating,
+    AvgOpponentRating = avg_opp_rating,
+    stringsAsFactors = FALSE
+  ))
+}
+
+# View output
+# View and save
+kable(
+  output %>% slice(1:20),
+  caption = "Tournament_results"
+)
+
+# save to CSV
+write.csv(output, "tournament_results.csv", row.names = FALSE)
+```
+
+Tournament Results with Opponents and Rounds Played
+
+```{r}
+# Prepare output data frame
+output <- data.frame(
+  Player = character(),
+  State = character(),
+  Points = numeric(),
+  PreRating = integer(),
+  AvgOpponentRating = numeric(),
+  RoundsPlayed = integer(),
+  OpponentNums = character(),
+  stringsAsFactors = FALSE
+)
+
+# Loop through players
+for (i in seq_along(player_lines)) {
+  pl <- player_lines[i]
+  info <- info_lines[i]
+
+  # Extract clean player name
+  name <- trimws(gsub("^\\d+\\s*\\|\\s*", "", substr(pl, 5, 36)))
+
+  # Extract points
+  points_match <- regmatches(pl, regexpr("\\|\\s*[0-9]+\\.?[0-9]*\\s*\\|", pl))
+  points <- as.numeric(gsub("[^0-9.]", "", points_match))
+
+  # Extract state
+  state_match <- regmatches(info, regexpr("\\b[A-Z]{2}\\b", info))
+  state <- if (length(state_match) > 0) state_match else NA
+
+  # Extract pre-rating
+  rating_match <- regmatches(info, regexpr("R:\\s*\\d+", info))
+  pre_rating <- as.integer(gsub("R:\\s*", "", rating_match))
+
+  # Extract opponent indices from round results
+  rounds <- unlist(strsplit(pl, "\\|"))
+  rounds <- rounds[4:length(rounds)]  # skip first 3 parts
+  opp_indices <- as.integer(gsub("[^0-9]", "", rounds))
+  opp_indices <- opp_indices[!is.na(opp_indices)]
+
+  # Calculate average opponent rating
+  if (length(opp_indices) > 0) {
+    opp_ratings <- pre_ratings[opp_indices]
+    avg_opp_rating <- round(mean(opp_ratings, na.rm = TRUE), 0)
+  } else {
+    avg_opp_rating <- NA
+  }
+
+  # Add row to output (collapse opponent indices into a string)
+  output <- rbind(output, data.frame(
+    Player = name,
+    State = state,
+    Points = points,
+    PreRating = pre_rating,
+    AvgOpponentRating = avg_opp_rating,
+    RoundsPlayed = length(opp_indices),
+    OpponentNums = paste(opp_indices, collapse = ","),
+    stringsAsFactors = FALSE
+  ))
+}
+# View and save
+kable(
+  output %>% slice(1:20),
+  caption = "Tournament Results with Opponents and Rounds Played"
+)
+
+```
+This tidy structure allows for comparison between actual and expected performance, identification of top overperformers and underperformers, and fair performance evaluation based on opponent strength.
+
+
+Elo calculation
+
+```{r}
+# Elo expected score function
+elo_expect <- function(r_player, r_opp) {
+  1 / (1 + 10 ^ ((r_opp - r_player) / 400))
+}
+
+# --- Compute rounds played robustly ---
+if (exists("player_lines") && length(player_lines) == nrow(output)) {
+  # Extract opponent indices from the stored player_lines (same logic as earlier)
+  rounds_played <- sapply(player_lines, function(pl) {
+    parts <- unlist(strsplit(pl, "\\|"))
+    if (length(parts) < 4) return(0L)
+    opp_parts <- parts[4:length(parts)]
+    opp_indices <- as.integer(gsub("[^0-9]", "", opp_parts))
+    sum(!is.na(opp_indices))
+  })
+} else if ("OpponentNums" %in% names(output)) {
+  # If you saved OpponentNums as "2,5,8" or "2 5 8"
+  rounds_played <- sapply(output$OpponentNums, function(x) {
+    if (is.na(x) || x == "") return(0L)
+    length(unlist(strsplit(as.character(x), "[,\\s]+")))
+  })
+} else {
+  rounds_played <- rep(NA_integer_, nrow(output))
+  warning("Could not infer RoundsPlayed from player_lines or OpponentNums. RoundsPlayed set to NA.")
+}
+
+# --- Add columns using dplyr::mutate ---
+library(dplyr)
+
+output <- output %>%
+  mutate(
+    RoundsPlayed = rounds_played,
+    # compute Expected only when we have the necessary values
+    Expected = ifelse(
+      !is.na(PreRating) & !is.na(AvgOpponentRating) & !is.na(RoundsPlayed),
+      elo_expect(PreRating, AvgOpponentRating) * RoundsPlayed,
+      NA_real_
+    ),
+    Diff = Points - Expected
+  )
+
+# View and save
+kable(
+  output %>% slice(1:20),
+  caption = "Tournament_results_with_expected"
+)
+
+write.csv(output, "tournament_results_with_expected.csv", row.names = FALSE)
+
+
+```
+
+
+Top overperformers
+
+
+```{r}
+kable(
+  output %>%
+    arrange(desc(Diff)) %>%
+    slice(1:5) %>%
+    select(Player, State, Points, PreRating, AvgOpponentRating, RoundsPlayed, Expected),
+  caption = "Top 5 Overerperformers"
+)
+```
+
+Top 5 underperformers
+
+```{r}
+kable(
+  output %>%
+    arrange(Diff) %>%
+    slice(1:5) %>%
+    select(Player, State, Points, PreRating, AvgOpponentRating, RoundsPlayed, Expected),
+  caption = "Top 5 Underperformers"
+)
+```
+
+
+
+2. movielens Dataset
+
+
+
+The MovieLens dataset originally consisted of two separate wide files, one for user ratings and one for movie details. The ratings file included user IDs, movie IDs, and scores, while the movies file included IDs, titles, and genre indicators. By joining these two tables on the movie_id, I created a CSV that combines user ratings with movie titles, keeping the dataset structured in a wide format. Tidying this data makes it easier to perform tasks such as analyzing user preferences by movie title rather than only by ID.
+
+
+
+Data Cleanup involved.
+
+Joined ratings with movie titles.
+
+Calculated average ratings per movie.
+
+Computed baseline predictions for ratings.
+
+Load rating data
+
+```{r}
+
+
+# Read ratings data
+ratings <- read_delim(
+  "http://files.grouplens.org/datasets/movielens/ml-100k/u.data",
+  delim = "\t",
+  col_names = c("user_id", "movie_id", "rating", "timestamp"),
+  show_col_types = FALSE
+)
+
+# Define movie columns
+movie_cols <- c(
+  "movie_id", "title", "release_date", "video_release_date", "IMDb_URL",
+  "unknown", "Action", "Adventure", "Animation", "Children's", "Comedy", "Crime",
+  "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "Musical",
+  "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"
+)
+
+genre_cols <- movie_cols[6:length(movie_cols)]
+# Load movie data
+# Read movies data
+movies <- read_delim(
+  "http://files.grouplens.org/datasets/movielens/ml-100k/u.item",
+  delim = "|",
+  col_names = movie_cols,
+  locale = locale(encoding = "latin1")
+) %>%
+  select(movie_id, title, all_of(genre_cols))
+
+# View the first few rows
+#head(movies)
+head(ratings)
+```
+
+```{r}
+head(movies)
+```
+
+Read the information file into R, and use tidyr and dplyr as needed to
+tidy and transform your data. 
+
+use library(dplyr) to join rating and movie to create a csv with title, user_id, movie_id, rating.
+
+```{r}
+# Join ratings with movie titles
+ratings_with_titles <- ratings %>%
+  inner_join(movies %>% select(movie_id, title), by = "movie_id") %>%
+  select(title, user_id, movie_id, rating )
+
+# Preview
+##head(ratings_with_titles)
+# Show as a nice table
+kable(head(ratings_with_titles, 10), caption = "Sample of Ratings with Movie Titles")
+
+# Save to CSV
+write_csv(ratings_with_titles, "ratings_with_titles.csv")
+```
+
+
+Plot Top 20 Movies by Average Rating
+
+```{r}
+
+
+ratings_with_titles %>%
+  group_by(title) %>%
+  summarise(avg_rating = mean(rating), n = n(), .groups = "drop") %>%
+  arrange(desc(avg_rating)) %>%
+  slice(1:20) %>%   # top 20 movies
+  ggplot(aes(x = reorder(title, avg_rating), y = avg_rating)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 20 Movies by Average Rating", x = "Movie", y = "Average Rating")
+
+```
+
+Predicted rating calculated using the baseline method.
+
+
+Predicted Ratings Using the Baseline Method
+
+The predicted rating for a movie is calculated using the baseline formula:
+
+\[
+\hat{r}_{i} = \mu + b_i
+\]
+
+Where:
+
+- \(\mu\) = global mean rating  
+- \(b_i\) = item bias (the average deviation of a movie's ratings from the global mean)
+
+We then identified the 20 lowest-performing movies and computed their predicted ratings using this formula.
+
+```{r}
+# Global mean
+mu <- mean(ratings_with_titles$rating)
+
+# Compute user bias
+user_bias <- ratings_with_titles %>%
+  group_by(user_id) %>%
+  summarise(b_u = mean(rating - mu), .groups = "drop")
+
+# Compute item bias
+item_bias <- ratings_with_titles %>%
+  group_by(movie_id, title) %>%
+  summarise(b_i = mean(rating - mu), .groups = "drop")
+
+# Join biases back into full dataset
+baseline_preds <- ratings_with_titles %>%
+  left_join(user_bias, by = "user_id") %>%
+  left_join(item_bias, by = c("movie_id", "title")) %>%
+  mutate(pred_rating = mu + b_u + b_i)
+
+# Find 20 lowest performing movies (by actual avg rating)
+# n is the total number of people that rated the movie
+lowest20 <- ratings_with_titles %>%
+  group_by(movie_id, title) %>%
+  summarise(avg_rating = mean(rating), n = n(), .groups = "drop") %>%
+  arrange(avg_rating) %>%
+  slice(1:20)
+
+# Predicted ratings for those 20 movies
+predicted_lowest20 <- lowest20 %>%
+  left_join(item_bias, by = c("movie_id", "title")) %>%
+  mutate(pred_rating = mu + b_i)   # aggregate baseline (ignoring user-specific bias)
+
+# Show results
+kable(predicted_lowest20, caption = "Predicted Ratings for 20 Lowest Performing Movies (Baseline)")
+```
+
+Plot Predicted Ratings for 20 Lowest Performing Movies.
+
+```{r}
+
+# Plot Predicted Ratings for 20 Lowest Performing Movies
+ggplot(predicted_lowest20, aes(x = reorder(title, pred_rating), y = pred_rating)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +  # horizontal bars
+  labs(
+    title = "Ratings for 20 Lowest Performing",
+    x = "Movie",
+    y = "Predicted Rating"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+
+
+
+
+
+
+3. Test score data
+
+
+The test score dataset was a wide structure, with each subject (Math, Science, History) represented as its own column. While this format is easy to read for humans, it is not optimal for analysis in R. Using pivot_longer(), I transformed the dataset into tidy form, where each row represents a student, subject, score combination. This tidy structure allows for straightforward filtering, grouping, and visualization of student performance across different subjects.
+
+https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Test_score
+
+Load data into R
+
+```{r}
+# Read the file
+Score <- read_csv("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Test_score",
+                  show_col_types = FALSE)
+print(Score)
+```
+
+
+Read the information from your .CSV file into R, and use tidyr and dplyr as needed to
+tidy and transform your data. 
+
+Score is a wide dataset (each subject in its own column). To make it tidy (long format, one row per student, subject, score), I use pivot_longer() from tidyr.
+
+
+```{r}
+# Assuming Score already looks like your example
+Score_tidy <- Score %>%
+  pivot_longer(
+    cols = c(Math, Science, History),   # the subject columns
+    names_to = "Subject",               # new column for subject name
+    values_to = "Score"                 # new column for score values
+  )
+
+# View tidy data
+#print(Score_tidy)
+kable(Score_tidy)
+# Optionally save to CSV
+write_csv(Score_tidy, "Score_tidy.csv")
+```
+
+
+Average score per subject
+```{r}
+Score %>%
+  pivot_longer(cols = c(Math, Science, History), names_to = "Subject", values_to = "Score") %>%
+  group_by(Subject) %>%
+  summarise(Average = mean(Score, na.rm = TRUE), .groups = "drop")
+```
+
+
+
+Plot Scores by Subject and Student
+````{r}
+ggplot(Score_tidy, aes(x = Subject, y = Score, fill = Name)) +
+  geom_col(position = "dodge") +
+  labs(title = "Scores by Subject and Student") +
+  theme_minimal()
+````
+
+
+Plot Student Performance Across Subjects
+
+```{r}
+ggplot(Score_tidy, aes(x = Subject, y = Score, group = Name, color = Name)) +
+  geom_line(size = 1) +
+  geom_point(size = 3) +
+  labs(title = "Student Performance Across Subjects") +
+  theme_minimal()
+```
+
+
+
+
+
+CONCLUCIOM
+ For the tournament data, cleaning and parsing allowed calculation of derived metrics like average opponent rating and expected Elo scores, which highlighted top performers and underperformers. For the MovieLens dataset, joining ratings with movie metadata and applying a baseline prediction model allowed identification of both high and low performing movies and estimation of predicted ratings. Finally, for the test scores dataset, converting the wide format into tidy long format enabled calculation of subject wise averages and visualization of individual student performance trends.
+
+These illustrated the importance of tidying data, calculating summary statistics, and applying basic predictive models to extract insights. The cleaned datasets are saved as CSV files, providing reproducible, analysis-ready resources for future work.
+
+
+
+
+Resource
+https://www.geeksforgeeks.org/data-analysis/what-is-data-transformation/
