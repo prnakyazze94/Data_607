@@ -1,0 +1,112 @@
+{
+  "audiobooks": [
+    {
+      "title": "He's Not My Type",
+      "subtitle": "Vancouver Agitators Series, Book 4",
+      "authors": ["Meghan Quinn"],
+      "narrators": [
+        "Connor Crais",
+        "Erin Mallon",
+        "Teddy Hamilton",
+        "Jason Clarke",
+        "J.F. Harding",
+        "Kelsey Navarro-Foster"
+      ],
+      "series": "The Vancouver Agitators",
+      "length": "Length: 11 hrs and 40 mins",
+      "release_date": "Release date: 11-28-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 362,
+      "regular_price": "$24.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/Hes-Not-My-Type-Audiobook/B0CMJSQSJF"
+    },
+    {
+      "title": "Thesaurize",
+      "subtitle": "The Completionist Chronicles, Book 10",
+      "authors": ["Dakota Krout"],
+      "narrators": ["Luke Daniels"],
+      "series": "The Completionist Chronicles",
+      "length": "Length: 11 hrs and 40 mins",
+      "release_date": "Release date: 11-06-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 328,
+      "regular_price": "$24.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/Thesaurize-Audiobook/B0CMR1XPQY"
+    },
+    {
+      "title": "Moral Stand",
+      "subtitle": "Aether's Revival, Book 7",
+      "authors": ["Daniel Schinhofen"],
+      "narrators": ["Andrea Parsneau"],
+      "series": "Aether's Revival",
+      "length": "Length: 13 hrs and 3 mins",
+      "release_date": "Release date: 11-17-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 164,
+      "regular_price": "$24.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/Moral-Stand-Audiobook/B0CNKVXCJ6"
+    },
+    {
+      "title": "LLC Beginner’s Guide",
+      "subtitle": "How to Successfully Start and Maintain a Limited Liability Company Even if You’ve Got Zero Experience: A Complete Up-to-Date & Easy-to-Follow Guide",
+      "authors": ["Walter Grant"],
+      "narrators": ["John Killawee"],
+      "length": "Length: 3 hrs and 8 mins",
+      "release_date": "Release date: 11-03-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 51,
+      "regular_price": "$14.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/LLC-Beginners-Guide-Audiobook/B0CMFJ7Y64"
+    },
+    {
+      "title": "How to Talk to Anyone and Enchant Them into Liking You",
+      "subtitle": "Proven Techniques to Become a People-Magnet by Building Positive, Lasting Relationships and Becoming the Most Likable Person in the Room",
+      "authors": ["Carl Wolfe"],
+      "narrators": ["Tim Alexander"],
+      "length": "Length: 3 hrs and 21 mins",
+      "release_date": "Release date: 11-03-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 50,
+      "regular_price": "$14.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/How-to-Talk-to-Anyone-and-Enchant-Them-into-Liking-You-Audiobook/B0CMF9B353"
+    },
+    {
+      "title": "Negotiating from a Position of Weakness",
+      "subtitle": "An 18 Step Comprehensive Negotiation System to Turn Vulnerability into Strength: Proven Techniques for Building Empathy, Embracing Vulnerability, and More",
+      "authors": ["David Whitehead"],
+      "narrators": ["Gerhard Weigelt"],
+      "length": "Length: 7 hrs and 7 mins",
+      "release_date": "Release date: 11-14-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 50,
+      "regular_price": "$19.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/Negotiating-from-a-Position-of-Weakness-Audiobook/B0CNB17GP4"
+    },
+    {
+      "title": "Freedom from Your Addiction",
+      "subtitle": "Take Care of Your Life Now",
+      "authors": ["Henry Matthias"],
+      "narrators": ["KC Wayman"],
+      "length": "Length: 3 hrs and 19 mins",
+      "release_date": "Release date: 11-16-23",
+      "language": "English",
+      "rating": "5 out of 5 stars",
+      "no_of_ratings": 50,
+      "regular_price": "$14.95",
+      "sales_price": "",
+      "url": "https://www.audible.com/pd/Freedom-from-Your-Addiction-Audiobook/B0CNDGZ84N"
+    }
+  ]
+}
