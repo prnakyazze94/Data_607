@@ -1,131 +1,182 @@
-<!DOCTYPE html>
-<html lang="en">
+
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Audiobook Data Table</title>
+  <title>Books Table</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid black; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+  </style>
 </head>
 <body>
-  <h2>Audiobook Data</h2>
-  <table border="1" cellspacing="0" cellpadding="6">
-    <tr>
-      <th>Title</th>
-      <th>Subtitle</th>
-      <th>Authors</th>
-      <th>Narrators</th>
-      <th>Series</th>
-      <th>Length</th>
-      <th>Release Date</th>
-      <th>Language</th>
-      <th>Rating</th>
-      <th>Ratings Count</th>
-      <th>Price</th>
-      <th>URL</th>
-    </tr>
-
-    <tr>
-      <td>He's Not My Type</td>
-      <td>Vancouver Agitators Series, Book 4</td>
-      <td>Meghan Quinn</td>
-      <td>Connor Crais, Erin Mallon, Teddy Hamilton, Jason Clarke, J.F. Harding, Kelsey Navarro-Foster</td>
-      <td>The Vancouver Agitators</td>
-      <td>11 hrs and 40 mins</td>
-      <td>11-28-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>362</td>
-      <td>$24.95</td>
-      <td><a href="https://www.audible.com/pd/Hes-Not-My-Type-Audiobook/B0CMJSQSJF">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>Thesaurize</td>
-      <td>The Completionist Chronicles, Book 10</td>
-      <td>Dakota Krout</td>
-      <td>Luke Daniels</td>
-      <td>The Completionist Chronicles</td>
-      <td>11 hrs and 40 mins</td>
-      <td>11-06-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>328</td>
-      <td>$24.95</td>
-      <td><a href="https://www.audible.com/pd/Thesaurize-Audiobook/B0CMR1XPQY">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>Moral Stand</td>
-      <td>Aether's Revival, Book 7</td>
-      <td>Daniel Schinhofen</td>
-      <td>Andrea Parsneau</td>
-      <td>Aether's Revival</td>
-      <td>13 hrs and 3 mins</td>
-      <td>11-17-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>164</td>
-      <td>$24.95</td>
-      <td><a href="https://www.audible.com/pd/Moral-Stand-Audiobook/B0CNKVXCJ6">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>LLC Beginner’s Guide</td>
-      <td>How to Successfully Start and Maintain a Limited Liability Company Even if You’ve Got Zero Experience</td>
-      <td>Walter Grant</td>
-      <td>John Killawee</td>
-      <td></td>
-      <td>3 hrs and 8 mins</td>
-      <td>11-03-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>51</td>
-      <td>$14.95</td>
-      <td><a href="https://www.audible.com/pd/LLC-Beginners-Guide-Audiobook/B0CMFJ7Y64">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>How to Talk to Anyone and Enchant Them into Liking You</td>
-      <td>Proven Techniques to Become a People-Magnet</td>
-      <td>Carl Wolfe</td>
-      <td>Tim Alexander</td>
-      <td></td>
-      <td>3 hrs and 21 mins</td>
-      <td>11-03-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>50</td>
-      <td>$14.95</td>
-      <td><a href="https://www.audible.com/pd/How-to-Talk-to-Anyone-and-Enchant-Them-into-Liking-You-Audiobook/B0CMF9B353">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>Negotiating from a Position of Weakness</td>
-      <td>An 18 Step Comprehensive Negotiation System</td>
-      <td>David Whitehead</td>
-      <td>Gerhard Weigelt</td>
-      <td></td>
-      <td>7 hrs and 7 mins</td>
-      <td>11-14-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>50</td>
-      <td>$19.95</td>
-      <td><a href="https://www.audible.com/pd/Negotiating-from-a-Position-of-Weakness-Audiobook/B0CNB17GP4">Link</a></td>
-    </tr>
-
-    <tr>
-      <td>Freedom from Your Addiction</td>
-      <td>Take Care of Your Life Now</td>
-      <td>Henry Matthias</td>
-      <td>KC Wayman</td>
-      <td></td>
-      <td>3 hrs and 19 mins</td>
-      <td>11-16-23</td>
-      <td>English</td>
-      <td>5 out of 5 stars</td>
-      <td>50</td>
-      <td>$14.95</td>
-      <td><a href="https://www.audible.com/pd/Freedom-from-Your-Addiction-Audiobook/B0CNDGZ84N">Link</a></td>
-    </tr>
+  <h2>Books List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Subtitle</th>
+        <th>Authors</th>
+        <th>Coauthors</th>
+        <th>Release Date</th>
+        <th>Language</th>
+        <th>Stars</th>
+        <th>Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>He's Not My Type</td>
+        <td>Vancouver Agitators Series, Book 4</td>
+        <td>Meghan Quinn</td>
+        <td>Connor Crais, Erin Mallon, Teddy Hamilton, Jason Clarke, J.F. Harding, Kelsey Navarro-Foster</td>
+        <td>11-28-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>362</td>
+      </tr>
+      <tr>
+        <td>Thesaurize</td>
+        <td>The Completionist Chronicles, Book 10</td>
+        <td>Dakota Krout</td>
+        <td>Luke Daniels</td>
+        <td>11-06-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>328</td>
+      </tr>
+      <tr>
+        <td>Moral Stand</td>
+        <td>Aether's Revival, Book 7</td>
+        <td>Daniel Schinhofen</td>
+        <td>Andrea Parsneau</td>
+        <td>11-17-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>164</td>
+      </tr>
+      <tr>
+        <td>LLC Beginner’s Guide</td>
+        <td>How to Successfully Start and Maintain a Limited Liability Company Even if You’ve Got Zero Experience: A Complete Up-to-Date & Easy-to-Follow Guide</td>
+        <td>Walter Grant</td>
+        <td>John Killawee</td>
+        <td>11-03-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>51</td>
+      </tr>
+      <tr>
+        <td>How to Talk to Anyone and Enchant Them into Liking You</td>
+        <td>Proven Techniques to Become a People-Magnet by Building Positive, Lasting Relationships and Becoming the Most Likable Person in the Room</td>
+        <td>Carl Wolfe</td>
+        <td>Tim Alexander</td>
+        <td>11-03-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>50</td>
+      </tr>
+      <tr>
+        <td>Negotiating from a Position of Weakness</td>
+        <td>An 18 Step Comprehensive Negotiation System to Turn Vulnerability into Strength. Proven Techniques for Building Empathy, Embracing Vulnerability, and More</td>
+        <td>David Whitehead</td>
+        <td>Gerhard Weigelt</td>
+        <td>11-14-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>50</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Books Table</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid black; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <h2>Books List</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Subtitle</th>
+        <th>Authors</th>
+        <th>Coauthors</th>
+        <th>Release Date</th>
+        <th>Language</th>
+        <th>Stars</th>
+        <th>Rating</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>He's Not My Type</td>
+        <td>Vancouver Agitators Series, Book 4</td>
+        <td>Meghan Quinn</td>
+        <td>Connor Crais, Erin Mallon, Teddy Hamilton, Jason Clarke, J.F. Harding, Kelsey Navarro-Foster</td>
+        <td>11-28-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>362</td>
+      </tr>
+      <tr>
+        <td>Thesaurize</td>
+        <td>The Completionist Chronicles, Book 10</td>
+        <td>Dakota Krout</td>
+        <td>Luke Daniels</td>
+        <td>11-06-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>328</td>
+      </tr>
+      <tr>
+        <td>Moral Stand</td>
+        <td>Aether's Revival, Book 7</td>
+        <td>Daniel Schinhofen</td>
+        <td>Andrea Parsneau</td>
+        <td>11-17-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>164</td>
+      </tr>
+      <tr>
+        <td>LLC Beginner’s Guide</td>
+        <td>How to Successfully Start and Maintain a Limited Liability Company Even if You’ve Got Zero Experience: A Complete Up-to-Date & Easy-to-Follow Guide</td>
+        <td>Walter Grant</td>
+        <td>John Killawee</td>
+        <td>11-03-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>51</td>
+      </tr>
+      <tr>
+        <td>How to Talk to Anyone and Enchant Them into Liking You</td>
+        <td>Proven Techniques to Become a People-Magnet by Building Positive, Lasting Relationships and Becoming the Most Likable Person in the Room</td>
+        <td>Carl Wolfe</td>
+        <td>Tim Alexander</td>
+        <td>11-03-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>50</td>
+      </tr>
+      <tr>
+        <td>Negotiating from a Position of Weakness</td>
+        <td>An 18 Step Comprehensive Negotiation System to Turn Vulnerability into Strength. Proven Techniques for Building Empathy, Embracing Vulnerability, and More</td>
+        <td>David Whitehead</td>
+        <td>Gerhard Weigelt</td>
+        <td>11-14-23</td>
+        <td>English</td>
+        <td>5 out of 5 stars</td>
+        <td>50</td>
+      </tr>
+    </tbody>
   </table>
 </body>
 </html>
