@@ -1,0 +1,346 @@
+
+---
+title: "Working with XML and JSON in R"
+author: "Pricilla"
+date: "2025-10-08"
+output:
+  html_document: default
+  always_allow_html: true
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+
+
+library(webshot2)
+library(tidyverse)
+library(arrow)
+library(repurrrsive)
+library(jsonlite)
+library(XML)
+library(xml2)
+library(tableHTML)
+library(readr)
+library(knitr)
+library(kableExtra)
+library(stringi)
+library(rvest)
+library(dplyr)
+```
+Pick three of your favorite books on one of your favorite subjects. At least one of the books should have more
+than one author. For each book, include the title, authors, and two or three other attributes that you find
+interesting.
+
+
+Take the information that you’ve selected about these three books, and separately create three files which
+store the book’s information in HTML (using an html table), XML, and JSON formats (e.g. “books.html”,
+“books.xml”, and “books.json”).
+
+
+First I create a CSV that I can use to convert to any file type just because CSV is the most beloved flexible data type. I will load xml, html and JSON files into R too. 
+
+```{r}
+books <- read.csv("https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Books2.csv")
+```
+
+```{r}
+# View first rows
+head(books)
+
+```
+
+Data not displaying correctly because of the colon in raw data
+```{r}
+kable(
+  head(books[, c("title", "subtitle", "authors", "release_date", "language", "rating")])
+)
+```
+I can use original csv to output.
+
+HTML created out of csv
+
+
+
+
+
+```{r}
+html_table <- kable(
+  head(books), 
+  "html", 
+  caption = "My Top 6 Books HTML Table"
+) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+# Save the HTML table to a file
+save_kable(html_table, "books_info.html")
+
+# open the HTML in default browser
+browseURL("books_info.html")
+
+# Print table in RStudio Viewer
+
+webshot("books_info.html", file = "books_info.png", vwidth = 992)
+#html_table failed to print directly
+```
+
+
+JSON CREATED OUT OF CSV
+
+```{r}
+
+
+# Select subset of columns
+books_subset <- books[, c("title", "subtitle", "authors", "release_date", "language", "rating")]
+
+# Convert to JSON (pretty format)
+books_json <- toJSON(books_subset, pretty = TRUE)
+
+# Print JSON to console
+cat(books_json)
+
+# Save JSON to file
+write(books_json, "books_subset.json") 
+```
+
+
+
+
+XML CREATED OUT OF CSV
+
+```{r}
+# Select subset of columns from original books csv
+books_subset <- books[, c("title", "subtitle", "authors", "release_date", "language", "rating")]
+
+# Create root XML node
+books_xml <- newXMLNode("books")
+
+# Loop through each row to add book nodes
+apply(books_subset, 1, function(row) {
+  book_node <- newXMLNode("book", parent = books_xml)
+  newXMLNode("title", row["title"], parent = book_node)
+  newXMLNode("subtitle", row["subtitle"], parent = book_node)
+  newXMLNode("authors", row["authors"], parent = book_node)
+  newXMLNode("release_date", row["release_date"], parent = book_node)
+  newXMLNode("language", row["language"], parent = book_node)
+  newXMLNode("rating", row["rating"], parent = book_node)
+})
+
+# Save XML to file
+saveXML(books_xml, file = "books_subset.xml")
+
+# Print XML in R console
+cat(saveXML(books_xml))
+```
+
+Write R code, using your packages of choice, to load the information from each of the three sources into separate R data frames. Are the three data frames identical?
+
+READING MY RAW FILES INTO R 
+
+HTML LOADED INTO R
+
+
+LOAD HTML FILE INTO R 
+```{r}
+ # Load html file from github and save it as a webpage
+
+url <- "https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Bookstable.html"
+
+webpage <- read_html(url, encoding = "UTF-8")  # ensure UTF-8
+
+# Print raw HTML to console
+
+cat(as.character(webpage))
+```
+
+Create table from webpage. Html_node selects a single node from an HTML document that matches a CSS selector.
+
+While table is the CSS selector, so html_node(table) selects the first table element in the
+
+
+
+HTML LOADED INTO R TO CREATE A DF
+
+```{r}
+books_htmltable <- webpage %>% 
+  html_node("table") %>% 
+  html_table(fill = TRUE)
+
+
+
+# Use stringi to trim whitespace and remove non-ASCII characters
+books_htmltable <- books_htmltable %>%
+  mutate(across(everything(), ~ stri_trim_both(.)))  # trim spaces
+
+# remove problematic non-ASCII characters
+books_htmltable <- books_htmltable %>%
+  mutate(across(everything(), ~ stri_trans_general(., "Latin-ASCII")))
+
+
+
+head(books_htmltable)
+
+write.csv(books_htmltable, "books_from_html.csv", row.names = FALSE)
+
+```
+
+SELECT ONLY A FEW COLUMNS SO I CAN TELL THE DIFFERNCE IN HTML DF
+```{r}
+books_htmltable %>%
+  select(Title, Authors, `Release Date`, Language, Stars, Rating) %>%
+  head() %>%  # just to preview first few rows
+  kable(caption = "Preview of HTML Books Data")
+```
+ 
+
+
+```{r}
+# Preview the first few rows using kable
+kable(head(books_htmltable))
+```
+
+
+
+
+XML
+
+XML FILE LOADED INTO R
+
+
+```{r}
+
+# Force UTF-8 locale in this session because , and // are causing errors.
+Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
+
+ #Load XML file from github and save it as urlxml
+# Define the URL
+urlxml <- "https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/BooksXML.xml"
+
+# Read the XML file directly from the URL
+
+books_xml <- read_xml(urlxml, encoding = "UTF-8")
+
+# View the XML structure
+print(books_xml)
+
+# explore it more nicely
+xml_structure(books_xml)
+```
+
+SAVE XML FILE INTO R data frames
+Extract fields into a data frame
+
+Extract simple single-value fields (like title, subtitle, release_date, etc.) directly
+```{r}
+
+# Force UTF-8 locale in this session because , and // are causing errors.
+Sys.setlocale("LC_CTYPE", "en_US.UTF-8")
+
+
+# Extract <book> nodes 
+
+book_nodes <- xml_find_all(books_xml, ".//book")
+
+#create df
+books_dfxml <- tibble(
+  title = xml_text(xml_find_all(book_nodes, "title")),
+  subtitle = xml_text(xml_find_all(book_nodes, "subtitle")),
+  release_date = xml_text(xml_find_all(book_nodes, "release_date")),
+  language = xml_text(xml_find_all(book_nodes, "language")),
+  stars = xml_text(xml_find_all(book_nodes, "stars")),
+  rating = xml_text(xml_find_all(book_nodes, "rating"))
+)
+```
+
+Extract authors that are nested separately
+
+```{r}
+# Extract authors and coauthors
+authors_list <- lapply(book_nodes, function(x) {
+  xml_text(xml_find_all(x, ".//authors/author"))
+})
+
+coauthors_list <- lapply(book_nodes, function(x) {
+  xml_text(xml_find_all(x, ".//coauthors/coauthor"))
+})
+
+#  Combine all into one data frame ---
+books_dfxml <- books_dfxml %>%
+  mutate(
+    authors = sapply(authors_list, function(x) paste(x, collapse = ", ")),
+    coauthors = sapply(coauthors_list, function(x) paste(x, collapse = ", "))
+  )
+
+# View result ---
+print(books_dfxml)
+```
+
+
+```{r}
+# Preview the first few rows using kable
+kable(head(books_dfxml))
+```
+SELECT ONLY A FEW COLUMNS SO I CAN TELL THE DIFFERNCE IN XML DF
+```{r}
+books_dfxml %>%
+  select(title, authors, `release_date`, language, stars, rating) %>%
+  head() %>%  # just to preview first few rows
+  kable(caption = "Preview of XML Books Data")
+```
+
+
+
+
+JSON FILE LOADED INTO R
+```{r}
+# Define the GitHub raw URL
+urljson <- "https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/Booksjson.json"
+
+# Read the JSON directly from the URL
+books_json <- fromJSON(urljson)
+
+# View the structure
+str(books_json)
+```
+CONVERT JSON FILE INTO DF
+```{r}
+
+#  convert to a data frame
+books_dfjson <- as.data.frame(books_json)
+
+# View the first few rows
+head(books_dfjson)
+```
+
+```{r}
+# Preview the first few rows using kable
+kable(head(books_dfjson))
+```
+
+
+SELECT ONLY A FEW COLUMNS SO I CAN TELL THE DIFFERNCE IN JSON DF
+```{r}
+books_dfjson %>%
+  select(title, authors, `release_date`, language, rating,no_of_ratings ) %>%
+  head() %>%  # just to preview first few rows
+  kable(caption = "Preview of JSON Books Data")
+```
+
+
+
+
+Are the three data frames identical?
+
+No, the three data frames are not identical.
+
+JSON retains nested structures (authors/narrators arrays), XML and HTML have flattened text.
+JSON requires text cleaning, XML and HTML are more ready for analysis
+
+
+XML and HTML capture similar core fields but lose some detail and may have formatting inconsistencies.
+
+For analysis, I would likely need to standardize column names and formats before comparing or combining them. For example I have title and Title.Language: English and English.
+
+I personally like the xml file format the best when converted into a df, which comes as a suprise. I have not had a lot of experience with XML files.
