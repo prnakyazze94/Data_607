@@ -1,0 +1,100 @@
+---
+title: "TidyVerse EXTEND Assignment"
+author: "Pricilla"
+date: "2025-10-17"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+```
+
+## R Markdown
+This project is a collaborative collection of examples demonstrating how to use key functions from the Tidyverse which is a collection of R packages for data science.
+Each example shows practical, reproducible use cases of functions for data manipulation, transformation, and visualization.
+
+I will apply Tidyverse functions such as filter(), mutate(), summarize(), group_by(), select(), and ggplot() through simple, hands on examples.
+
+I will create a sythentic data set to show practica use of the functions above.
+
+# Load required packages
+library(tidyverse)
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Generate synthetic dataset
+employee_data <- tibble(
+  employee_id = 1:300,
+  name = paste("Employee", 1:300),
+  department = sample(c("Sales", "HR", "IT", "Finance", "Marketing"), 300, replace = TRUE),
+  gender = sample(c("Male", "Female"), 300, replace = TRUE),
+  age = sample(22:60, 300, replace = TRUE),
+  years_experience = round(runif(300, 0, 25), 1),
+  salary = round(rnorm(300, mean = 60000, sd = 15000), 0),
+  performance_score = round(runif(300, 1, 5), 1),
+  hire_date = sample(seq(as.Date('2010/01/01'), as.Date('2024/12/31'), by="day"), 300)
+)
+
+# Save to CSV
+write_csv(employee_data, "employee_data.csv")
+
+# Preview first few rows
+head(employee_data)
+```
+
+
+filter()
+Find employees in the IT department making more than $70000
+```{r}
+employee_data %>% filter(salary > 70000, department == "IT")
+```
+
+mutate()
+Creates a new variable or modifies existing ones.
+In this case bonus calculation
+For every row in your dataset, it takes the value in the salary column and multiplies it by 0.1 (10%).
+```{r}
+employee_data %>% mutate(bonus = salary * 0.1)
+```
+
+group_by() + summarize()
+
+Groups your data by the department column.
+That means all employees in the same department are treated as one group for the next step.
+summarize() collapses each group into a single row, using summary statistics like Mean to find average salary. For example avg_performance = mean(performance_score)
+```{r}
+employee_data %>%
+  group_by(department) %>%
+  summarize(avg_salary = mean(salary), avg_performance = mean(performance_score))
+```
+
+select()
+select allows you to only retun specific columns of the data.
+```{r}
+employee_data %>% select(name, department, salary)
+```
+
+ggplot()
+Employee data is passed to ggplot() using the pipe (%>%).
+Which initializes a ggplot object, mapping in this case.
+
+x = department → each department will be a category along the x-axis
+
+y = salary → the numeric variable to visualize on the y-axis
+
+fill = department → assigns each department a different color for clarity
+
+```{r}
+employee_data %>%
+  ggplot(aes(x = department, y = salary, fill = department)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Salary Distribution by Department", y = "Salary ($)")
+  
+```
+
