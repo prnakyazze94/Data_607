@@ -1,0 +1,226 @@
+---
+title: "NYT_API"
+author: "Pricilla"
+date: "2025-10-12"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load required packages
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(ggplot2)
+```
+
+
+
+Get Book data from NYT API for the last 4 months.
+Does a high rank translate to a longer time on the best selling list? 
+```{r}
+
+#  Read API key from GitHub file
+api_key_url <- "https://raw.githubusercontent.com/prnakyazze94/Data_607/refs/heads/main/NYT_API"
+api_key <- readLines(api_key_url, warn = FALSE)
+api_key <- trimws(api_key[1])  # ensure clean string, remove any spaces/newlines
+
+#  NYT Books API setup
+base_url <- "https://api.nytimes.com/svc/books/v3/lists"
+list_name <- "hardcover-fiction"  # You can change this to another NYT list name
+
+#  Function to fetch books for a given date 
+get_books_for_date <- function(date) {
+  url <- paste0(base_url, "/", date, "/", list_name, ".json")
+  res <- GET(url, query = list("api-key" = api_key))
+  
+  if (status_code(res) != 200) {
+    warning(paste("Failed for date:", date))
+    return(NULL)
+  }
+  
+  data <- fromJSON(content(res, as = "text"), flatten = TRUE)
+  books <- data$results$books
+  if (is.null(books)) return(NULL)
+  
+  df <- data.frame(
+    title = books$title,
+    author = books$author,
+    publisher = books$publisher,
+    rank = books$rank,
+    weeks_on_list = books$weeks_on_list,
+    stringsAsFactors = FALSE
+  )
+  
+  return(df)
+}
+
+# --- Get top books for multiple dates this year 
+current_year <- year(Sys.Date())
+dates <- seq.Date(from = Sys.Date(), to = Sys.Date() - 120, by = "-7 days")  # last 4 months
+dates <- format(dates, "%Y-%m-%d")
+
+all_books <- lapply(dates, get_books_for_date)
+all_books <- bind_rows(all_books)
+
+# --- Keep top 40 unique books
+top_books <- all_books %>%
+  distinct(title, .keep_all = TRUE) %>%
+  arrange(rank) %>%
+  head(40)
+
+# --- Print results 
+print(top_books)
+
+# Save to CSV 
+write.csv(top_books, "nyt_top40_books.csv", row.names = FALSE)
+```
+
+
+
+
+
+```{r}
+
+
+df_selected <- top_books %>%
+  select(title, author, publisher, rank, weeks_on_list)
+# Display in a clean table
+kable(df_selected, caption = "Top NYT Books - Selected Columns")
+```
+
+
+
+Plot NYT Top Books by Weeks on List
+```{r}
+
+# Arrange books by descending weeks_on_list
+plot_data <- df_selected %>%
+  arrange(desc(weeks_on_list))
+
+# Create horizontal bar plot
+ggplot(plot_data, aes(x = reorder(title, weeks_on_list), y = weeks_on_list)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "NYT Top Books by Weeks on List",
+    x = "Book Title",
+    y = "Weeks on NYT List"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8)
+  )
+```
+The Wedding people remained top sellers for over 35 weeks on the NYT best selling list. While almost 18 titles out of 40 were only on the list for less than 4 weeks.
+
+
+```{r}
+
+
+# from top_books data frame get top 15 `top_books`
+top_15_books <- top_books %>%
+  arrange(rank) %>%              # sort by rank ascending
+  select(rank, title) %>%        # keep only rank and title
+  head(15)                       # get top 15
+
+# View results
+print(top_15_books)
+```
+Top 15 books by rank over the last 4 months.
+```{r}
+
+
+# Prepare top 15 books
+top_15_books <- top_books %>%
+  arrange(rank) %>%
+  select(rank, title) %>%
+  head(15)
+
+# Horizontal bar plot
+ggplot(top_15_books, aes(x = reorder(title, -rank), y = rank)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +  # horizontal bars
+  scale_y_reverse(breaks = 1:15) + # reverse y-axis so rank 1 is at top
+  labs(
+    title = "Top 15 NYT Books by Rank",
+    x = "Book Title",
+    y = "Rank"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)
+  )
+```
+Relationship Between Rank and Weeks on List
+
+Do books that debut at 1 stay longer on the list?
+```{r}
+ggplot(top_books, aes(x = rank, y = weeks_on_list)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(title = "Rank vs Weeks on List")
+
+```
+
+A single data point is showing a specific rank and the corresponding number of weeks it spent on a list.
+
+The data is quite scattered, meaning there isn't a perfect or very strong relationship.
+
+Noticeable points exist far from the main cluster, especially those with high "Weeks on List" (For example one point near Rank 12 is close to 40 Weeks on List).
+
+Trend Line (Blue Line) is a linear regression line (or a similar smoothing line) that attempts to summarize the general trend in the data.
+
+The line has a positive slope, indicating a positive correlation between Rank and Weeks on List.
+
+In the context of typical rankings (where Rank 1 is the best), this positive slope suggests that as the Rank gets worse (increases from 1 to 12), the Weeks on List tends to increase.
+
+This is an unusual finding for a typical ranking where higher rank numbers should usually mean less time on a list. It suggests that items with lower (worse) ranks tend to stay on the list longer, or perhaps the 'Rank' variable is measuring something where a higher number is actually better, or the relationship is non-linear and not well-captured by the straight line.
+
+In summary just going by the data as it is, the image graphically explores the relationship between a list Rank and the number of Weeks on List, suggesting a weak positive trend, but with significant variability in the data.
+
+
+
+Count how many titles spent how long on best selling list.
+```{r}
+
+
+# Count how many titles per weeks_on_list
+cluster_counts <- top_books %>%
+  group_by(weeks_on_list) %>%
+  summarise(num_titles = n())
+
+# View results
+print(cluster_counts)
+```
+Most of the titles where on the best selling list for 1 to 3 weeks.
+
+
+
+Average time on the Top selling weeks list.
+```{r}
+# Ensure weeks_on_list is numeric
+top_books <- top_books %>%
+  mutate(weeks_on_list = as.numeric(as.character(weeks_on_list)))
+
+# Calculate average weeks on list
+average_weeks <- mean(top_books$weeks_on_list, na.rm = TRUE)
+
+# Print result
+print(average_weeks)
+```
+Summary of Weeks on List
+
+
+The analysis of the weeks_on_list data shows that most books are relatively new to the bestseller list. Out of all titles, 22 books have appeared on the list for only one week, indicating frequent turnover and strong competition among recent releases. A smaller number of books 4 titles for 2 weeks, and 3 titles each for 3 and 4 weeks demonstrate moderate staying power. Only a handful of books have shown long-term popularity, remaining on the list for 13, 16, 17, 20, and 26 weeks respectively. Overall, this suggests that while the bestseller list changes often, a few standout titles maintain consistent reader interest over time. The Average time a book stays on the best seller List is 5.55 weeks. 
+
+
