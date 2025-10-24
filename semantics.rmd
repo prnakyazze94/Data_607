@@ -1,0 +1,583 @@
+---
+title: "Sentiment_Analysis"
+author: "Pricilla"
+date: "2025-10-24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidytext)
+library(dplyr)
+library(textdata)
+library(janeaustenr)
+library(gutenbergr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+library(sentimentr)
+library(patchwork)
+```
+Sentiment Analysis with Tidy Data
+
+#By Silge, J., & Robinson, D. (2017). *Text Mining with R: A Tidy Approach* (Chapter 2: Sentiment Analysis). #O’Reilly Media.
+
+We will reproduce the base Jane Austen sentiment analysis, then extend it to a new corpus (Shakespeare) and include an extra lexicon (`sentimentr`) for sentence level sentiment.
+
+
+Base Jane Austen Sentiment Analysis
+```{r}
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+```
+Most common joy words in Emma
+
+```{r}
+nrc_joy <- get_sentiments("nrc") %>% filter(sentiment == "joy")
+
+tidy_books %>%
+filter(book == "Emma") %>%
+inner_join(nrc_joy) %>%
+count(word, sort = TRUE)
+```
+Sentiment trajectory per book (Bing lexicon)
+```{r}
+
+jane_austen_sentiment <- tidy_books %>%
+inner_join(get_sentiments("bing")) %>%
+count(book, index = linenumber %/% 80, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment = positive - negative)
+
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~book, ncol = 2, scales = "free_x") +
+labs(
+x = "Text Section (80 lines each)",
+y = "Net Sentiment (positive - negative)",
+title = "Sentiment Trajectories Across Jane Austen Novels"
+)
+```
+
+
+New Corpus Shakespeare (Gutenberg)
+Download and tidy Shakespeare plays
+```{r}
+shakespeare_meta <- gutenberg_works(author == "Shakespeare, William")
+shakespeare_ids <- shakespeare_meta$gutenberg_id[1:6]
+
+shakespeare_raw <- gutenberg_download(shakespeare_ids) %>%
+left_join(shakespeare_meta %>% select(gutenberg_id, title), by = "gutenberg_id") %>%
+group_by(title) %>%
+mutate(linenumber = row_number(), index = linenumber %/% 80) %>%
+ungroup()
+
+tidy_shakespeare <- shakespeare_raw %>% unnest_tokens(word, text)
+```
+
+Apply Multiple Lexicons
+AFINN
+```{r}
+afinn_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(title, index) %>%
+  summarise(sentiment_afinn = sum(value, na.rm = TRUE), .groups = "drop")
+
+```
+AFINN lexicon words in Shakespeare
+
+```{r}
+
+afinn_sh <- tidy_shakespeare %>% 
+  inner_join(get_sentiments("afinn"), by = "word") %>% 
+  slice_head(n = 10)
+  afinn_sh
+
+```
+
+Bing & NRC (positive - negative)
+```{r}
+bing_nrc_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(title, index, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment_bing = positive - negative) %>%
+  select(title, index, sentiment_bing)
+
+nrc_posneg_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("nrc") %>% filter(sentiment %in% c("positive", "negative")), by = "word") %>%
+  count(title, index, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment_nrc = positive - negative) %>%
+  select(title, index, sentiment_nrc)
+
+```
+
+
+Bing lexicon words in Shakespeare
+
+
+```{r}
+bing_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), by = "word") %>%
+slice_head(n = 10)
+bing_sh
+```
+NRC lexicon words in Shakespeare
+
+
+```{r}
+nrc_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("nrc"), by = "word") %>%
+slice_head(n = 10)
+nrc_sh
+```
+Combine lexicon results
+```{r}
+shakespeare_sentiment_chunks <- afinn_sh %>%
+  left_join(bing_nrc_sh, by = c("title","index")) %>%
+  left_join(nrc_posneg_sh, by = c("title","index"))
+
+```
+
+Extra Lexicon Sentence-level with sentimentr
+```{r}
+chunks <- shakespeare_raw %>%
+  group_by(title, index) %>%
+  summarise(text_chunk = paste(text, collapse = " "), .groups = "drop")
+
+sentimentr_results <- sentiment_by(chunks$text_chunk)
+chunks$sentimentr_avg <- sentimentr_results$ave_sentiment
+
+```
+
+
+View NRC lexicon structure
+
+
+```{r}
+nrc_lexicon <- get_sentiments("nrc")
+head(nrc_lexicon, 10)
+```
+Filter NRC lexicon for joy words
+
+```{r}
+nrc_joy <- get_sentiments("nrc") %>%
+filter(sentiment == "joy")
+
+#Count the most common joy words in Shakespeare plays
+
+tidy_shakespeare %>%
+inner_join(nrc_joy, by = "word") %>%
+count(word, sort = TRUE) %>%
+slice_head(n = 10)
+```
+
+
+
+Sentiment trajectory per book (Bing lexicon)
+```{r}
+shakespeare_sentiment <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), relationship = "many-to-many") %>%
+count(title, index = linenumber %/% 80, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment = positive - negative)
+
+ggplot(shakespeare_sentiment, aes(index, sentiment, fill = title)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~title, ncol = 2, scales = "free_x") +
+labs(
+x = "Text Section (80 lines each)",
+y = "Net Sentiment (positive - negative)",
+title = "Sentiment Trajectories Across Shakespeare Plays"
+)
+```
+
+
+
+
+
+
+
+# Download and tidy Shakespeare plays
+
+shakespeare_meta <- gutenberg_works(author == "Shakespeare, William")
+shakespeare_ids <- shakespeare_meta$gutenberg_id[1:6]
+
+shakespeare_raw <- gutenberg_download(shakespeare_ids) %>%
+left_join(shakespeare_meta %>% select(gutenberg_id, title), by = "gutenberg_id") %>%
+group_by(title) %>%
+mutate(linenumber = row_number(),
+index = linenumber %/% 80) %>%
+ungroup()
+
+tidy_shakespeare <- shakespeare_raw %>%
+unnest_tokens(word, text)
+```{r}
+# Compute AFINN sentiment per chunk
+
+afinn_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("afinn"), by = "word") %>%
+group_by(title, index) %>%
+summarise(sentiment_afinn = sum(value, na.rm = TRUE), .groups = "drop")
+
+# Compute Bing sentiment per chunk (positive - negative)
+
+bing_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), by = "word") %>%
+count(title, index, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment_bing = positive - negative) %>%
+select(title, index, sentiment_bing)
+
+# Compute NRC sentiment (positive - negative) per chunk
+
+nrc_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("nrc") %>% filter(sentiment %in% c("positive","negative")), by = "word") %>%
+count(title, index, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment_nrc = positive - negative) %>%
+select(title, index, sentiment_nrc)
+
+# Compute sentence-level sentiment with sentimentr
+
+chunks <- shakespeare_raw %>%
+group_by(title, index) %>%
+summarise(text_chunk = paste(text, collapse = " "), .groups = "drop")
+
+sentimentr_results <- sentiment_by(chunks$text_chunk)
+chunks$sentimentr_avg <- sentimentr_results$ave_sentiment
+
+# Combine all sentiment measures into one data frame
+
+shakespeare_sentiment_chunks <- afinn_sh %>%
+left_join(bing_sh, by = c("title","index")) %>%
+left_join(nrc_sh, by = c("title","index")) %>%
+left_join(chunks %>% select(title, index, sentimentr_avg), by = c("title","index"))
+
+# Example: pivot longer for plotting comparison for one title
+
+example_title <- unique(shakespeare_sentiment_chunks$title)[1]
+
+compare_df <- shakespeare_sentiment_chunks %>%
+filter(title == example_title) %>%
+pivot_longer(
+cols = c(sentiment_afinn, sentiment_bing, sentiment_nrc, sentimentr_avg),
+names_to = "method",
+values_to = "score"
+)
+
+# Plot sentiment comparison
+
+ggplot(compare_df, aes(index, score, fill = method)) +
+geom_col(position = "dodge") +
+facet_wrap(~method, ncol = 1, scales = "free_y") +
+labs(
+title = paste("Comparison of sentiment methods —", example_title),
+x = "Index (chunks of 80 lines)",
+y = "Sentiment (method-specific scale)"
+)
+```---
+title: "Sentiment_Analysis"
+author: "Pricilla"
+date: "2025-10-24"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidytext)
+library(dplyr)
+library(textdata)
+library(janeaustenr)
+library(gutenbergr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+library(sentimentr)
+library(patchwork)
+```
+Sentiment Analysis with Tidy Data
+
+#By Silge, J., & Robinson, D. (2017). *Text Mining with R: A Tidy Approach* (Chapter 2: Sentiment Analysis). #O’Reilly Media.
+
+We will reproduce the base Jane Austen sentiment analysis, then extend it to a new corpus (Shakespeare) and include an extra lexicon (`sentimentr`) for sentence level sentiment.
+
+
+Base Jane Austen Sentiment Analysis
+```{r}
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+```
+Most common joy words in Emma
+
+```{r}
+nrc_joy <- get_sentiments("nrc") %>% filter(sentiment == "joy")
+
+tidy_books %>%
+filter(book == "Emma") %>%
+inner_join(nrc_joy) %>%
+count(word, sort = TRUE)
+```
+Sentiment trajectory per book (Bing lexicon)
+```{r}
+
+jane_austen_sentiment <- tidy_books %>%
+inner_join(get_sentiments("bing")) %>%
+count(book, index = linenumber %/% 80, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment = positive - negative)
+
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~book, ncol = 2, scales = "free_x") +
+labs(
+x = "Text Section (80 lines each)",
+y = "Net Sentiment (positive - negative)",
+title = "Sentiment Trajectories Across Jane Austen Novels"
+)
+```
+
+
+New Corpus Shakespeare (Gutenberg)
+Download and tidy Shakespeare plays
+```{r}
+shakespeare_meta <- gutenberg_works(author == "Shakespeare, William")
+shakespeare_ids <- shakespeare_meta$gutenberg_id[1:6]
+
+shakespeare_raw <- gutenberg_download(shakespeare_ids) %>%
+left_join(shakespeare_meta %>% select(gutenberg_id, title), by = "gutenberg_id") %>%
+group_by(title) %>%
+mutate(linenumber = row_number(), index = linenumber %/% 80) %>%
+ungroup()
+
+tidy_shakespeare <- shakespeare_raw %>% unnest_tokens(word, text)
+```
+
+Apply Multiple Lexicons
+AFINN
+```{r}
+afinn_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(title, index) %>%
+  summarise(sentiment_afinn = sum(value, na.rm = TRUE), .groups = "drop")
+
+```
+AFINN lexicon words in Shakespeare
+
+```{r}
+
+afinn_sh <- tidy_shakespeare %>% 
+  inner_join(get_sentiments("afinn"), by = "word") %>% 
+  slice_head(n = 10)
+  afinn_sh
+
+```
+
+Bing & NRC (positive - negative)
+```{r}
+bing_nrc_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(title, index, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment_bing = positive - negative) %>%
+  select(title, index, sentiment_bing)
+
+nrc_posneg_sh <- tidy_shakespeare %>%
+  inner_join(get_sentiments("nrc") %>% filter(sentiment %in% c("positive", "negative")), by = "word") %>%
+  count(title, index, sentiment) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+  mutate(sentiment_nrc = positive - negative) %>%
+  select(title, index, sentiment_nrc)
+
+```
+
+
+Bing lexicon words in Shakespeare
+
+
+```{r}
+bing_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), by = "word") %>%
+slice_head(n = 10)
+bing_sh
+```
+NRC lexicon words in Shakespeare
+
+
+```{r}
+nrc_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("nrc"), by = "word") %>%
+slice_head(n = 10)
+nrc_sh
+```
+Combine lexicon results
+```{r}
+shakespeare_sentiment_chunks <- afinn_sh %>%
+  left_join(bing_nrc_sh, by = c("title","index")) %>%
+  left_join(nrc_posneg_sh, by = c("title","index"))
+
+```
+
+Extra Lexicon Sentence-level with sentimentr
+```{r}
+chunks <- shakespeare_raw %>%
+  group_by(title, index) %>%
+  summarise(text_chunk = paste(text, collapse = " "), .groups = "drop")
+
+sentimentr_results <- sentiment_by(chunks$text_chunk)
+chunks$sentimentr_avg <- sentimentr_results$ave_sentiment
+
+```
+
+
+View NRC lexicon structure
+
+
+```{r}
+nrc_lexicon <- get_sentiments("nrc")
+head(nrc_lexicon, 10)
+```
+Filter NRC lexicon for joy words
+
+```{r}
+nrc_joy <- get_sentiments("nrc") %>%
+filter(sentiment == "joy")
+
+#Count the most common joy words in Shakespeare plays
+
+tidy_shakespeare %>%
+inner_join(nrc_joy, by = "word") %>%
+count(word, sort = TRUE) %>%
+slice_head(n = 10)
+```
+
+
+
+Sentiment trajectory per book (Bing lexicon)
+```{r}
+shakespeare_sentiment <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), relationship = "many-to-many") %>%
+count(title, index = linenumber %/% 80, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment = positive - negative)
+
+ggplot(shakespeare_sentiment, aes(index, sentiment, fill = title)) +
+geom_col(show.legend = FALSE) +
+facet_wrap(~title, ncol = 2, scales = "free_x") +
+labs(
+x = "Text Section (80 lines each)",
+y = "Net Sentiment (positive - negative)",
+title = "Sentiment Trajectories Across Shakespeare Plays"
+)
+```
+
+
+
+
+
+
+
+# Download and tidy Shakespeare plays
+
+shakespeare_meta <- gutenberg_works(author == "Shakespeare, William")
+shakespeare_ids <- shakespeare_meta$gutenberg_id[1:6]
+
+shakespeare_raw <- gutenberg_download(shakespeare_ids) %>%
+left_join(shakespeare_meta %>% select(gutenberg_id, title), by = "gutenberg_id") %>%
+group_by(title) %>%
+mutate(linenumber = row_number(),
+index = linenumber %/% 80) %>%
+ungroup()
+
+tidy_shakespeare <- shakespeare_raw %>%
+unnest_tokens(word, text)
+```{r}
+# Compute AFINN sentiment per chunk
+
+afinn_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("afinn"), by = "word") %>%
+group_by(title, index) %>%
+summarise(sentiment_afinn = sum(value, na.rm = TRUE), .groups = "drop")
+
+# Compute Bing sentiment per chunk (positive - negative)
+
+bing_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("bing"), by = "word") %>%
+count(title, index, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment_bing = positive - negative) %>%
+select(title, index, sentiment_bing)
+
+# Compute NRC sentiment (positive - negative) per chunk
+
+nrc_sh <- tidy_shakespeare %>%
+inner_join(get_sentiments("nrc") %>% filter(sentiment %in% c("positive","negative")), by = "word") %>%
+count(title, index, sentiment) %>%
+pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
+mutate(sentiment_nrc = positive - negative) %>%
+select(title, index, sentiment_nrc)
+
+# Compute sentence-level sentiment with sentimentr
+
+chunks <- shakespeare_raw %>%
+group_by(title, index) %>%
+summarise(text_chunk = paste(text, collapse = " "), .groups = "drop")
+
+sentimentr_results <- sentiment_by(chunks$text_chunk)
+chunks$sentimentr_avg <- sentimentr_results$ave_sentiment
+
+# Combine all sentiment measures into one data frame
+
+shakespeare_sentiment_chunks <- afinn_sh %>%
+left_join(bing_sh, by = c("title","index")) %>%
+left_join(nrc_sh, by = c("title","index")) %>%
+left_join(chunks %>% select(title, index, sentimentr_avg), by = c("title","index"))
+
+# Example: pivot longer for plotting comparison for one title
+
+example_title <- unique(shakespeare_sentiment_chunks$title)[1]
+
+compare_df <- shakespeare_sentiment_chunks %>%
+filter(title == example_title) %>%
+pivot_longer(
+cols = c(sentiment_afinn, sentiment_bing, sentiment_nrc, sentimentr_avg),
+names_to = "method",
+values_to = "score"
+)
+
+# Plot sentiment comparison
+
+ggplot(compare_df, aes(index, score, fill = method)) +
+geom_col(position = "dodge") +
+facet_wrap(~method, ncol = 1, scales = "free_y") +
+labs(
+title = paste("Comparison of sentiment methods —", example_title),
+x = "Index (chunks of 80 lines)",
+y = "Sentiment (method-specific scale)"
+)
+```
