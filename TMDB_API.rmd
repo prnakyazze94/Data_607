@@ -1,0 +1,74 @@
+---
+title: "Movie csv"
+author: "Pricilla"
+date: "2025-10-28"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(httr)
+library(jsonlite)
+library(dplyr)
+```
+
+
+
+
+```{r}
+
+
+BASE_URL <- "https://api.themoviedb.org/3"
+API_KEY <- "0c69112552ed7feffc1861d0920bc7a8"
+TOTAL_PAGES <- 500
+LANGUAGE <- "en-US"
+
+all_movies <- list()
+
+for (page in 1:TOTAL_PAGES) {
+  endpoint <- paste0(BASE_URL, "/movie/popular?api_key=", API_KEY,
+                     "&language=", LANGUAGE, "&page=", page)
+  
+  response <- GET(endpoint)
+  
+  if (status_code(response) != 200) {
+    next
+  }
+  
+  data <- fromJSON(content(response, as = "text", encoding = "UTF-8"))
+  movies <- data$results
+  
+  if (length(movies) == 0) {
+    break
+  }
+  
+  all_movies[[page]] <- movies %>%
+    select(id, title, release_date, popularity, vote_average, vote_count, overview)
+  
+  Sys.sleep(0.3)
+}
+
+movies_df <- bind_rows(all_movies)
+movies_df <- movies_df %>% distinct(id, .keep_all = TRUE)
+write.csv(movies_df, "tmdb_10000_movies.csv", row.names = FALSE)
+
+print(movies_df)
+```
+
+
+```{r}
+
+genre_endpoint <- paste0(BASE_URL, "/genre/movie/list?api_key=", API_KEY, "&language=en-US")
+
+response <- GET(genre_endpoint)
+genres_data <- fromJSON(content(response, as = "text", encoding = "UTF-8"))
+
+genres <- genres_data$genres %>%
+  as.data.frame()
+
+print(genres)
+write.csv(genres, "tmdb_genres.csv", row.names = FALSE)
+```
