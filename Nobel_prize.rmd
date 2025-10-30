@@ -152,7 +152,7 @@ kable(
 ) %>%
   kable_styling()
 ```
-How many and organisations have won a Nobel Prize?
+How many people and organisations have won a Nobel Prize?
 ```{r}
 # Count the total number of people/rows in the original data
 total_award_winners <- nrow(rows)
@@ -180,6 +180,10 @@ ggplot(award_top, aes(x = reorder(country, award_count), y = award_count, fill =
   theme(legend.position = "none")
 
 ```
+
+
+
+
 Who were the first 20 people to receive awards and in what categories?
 ```{r}
 # Get first 20 laureates with name, birth country, and affiliation country
@@ -195,6 +199,9 @@ first_20 %>%
         col.names = c("Name", "Birth Country", "Award Country", "Year", "Category")) %>%
   kable_styling()
 ```
+
+
+
 
 
 
