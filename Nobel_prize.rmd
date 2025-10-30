@@ -1,5 +1,5 @@
 ---
-title: "Nobel Price API"
+title: "Nobel Prize API"
 author: "Pricilla"
 date: "2025-10-29"
 output:
