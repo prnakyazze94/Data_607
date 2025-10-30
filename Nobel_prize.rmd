@@ -419,4 +419,4 @@ different_countries[1:10, ] %>%
 
 
 
-The average age to win a nobel prize is 61 years old and most winners are in the psyiology and medicine categories. Women have only won 65 prizes out if 971.The rest have been won by Organisations.
+The average age to win a nobel prize is 61 years old and most winners are in the psyiology and medicine categories. Women have only won 65 prizes out of 971.The rest have been won by Organisations.
