@@ -1,0 +1,83 @@
+---
+title: "Amazon's Recommender system"
+author: "Pricilla"
+date: "2025-11-04"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+1.Who are Amazon's Target Users?
+
+Amazon serves several distinct types of users:
+
+First time visitors exploring products without much browsing or purchase history.
+
+Returning customers who expect familiar, personalized suggestions.
+
+Gift shoppers with short-term, atypical interests.
+
+Prime members who rely heavily on the platform for convenience and tailored experiences.
+
+Amazon also serves an organizational goal of optimizing engagement, sales, and customer retention across billions of interactions daily.
+
+2.What are the target users Key Goals.
+
+To quickly find relevant and trustworthy products.
+
+To discover complementary or new items.
+
+To save time through personalization and convenience.
+
+For gift shoppers, to find appropriate items for others.
+
+2a, What is Amazon’s  goal?
+
+To increase purchase frequency and basket size.
+
+To drive user engagement via personalization loops.
+
+To maintain a scalable recommendation system that performs in real time.
+
+3. How Does the Recommendation System Help Users Achieve These Goals?
+
+Amazon’s recommender system helps users by combining multiple approaches:
+
+Item-Item Collaborative Filtering:
+“Customers who bought this also bought…” which finds products similar to those already interacted with.
+
+Content-Based Filtering:
+Uses metadata like brand, category, or features to recommend similar products, useful in cold-start situations.
+
+Implicit Feedback Modeling,
+Learns from clicks, dwell time, add-to-cart, and purchases instead of explicit ratings.
+
+Latent Factor and Deep Learning Models like Matrix factorization and deep learning uncover hidden patterns in user–item interactions to predict preferences.
+
+These techniques collectively balance personalization, scalability, and recommendation accuracy.
+
+4. User Experience
+
+Users experience recommendations throughout the site through Personalized homepages.
+
+“Frequently bought together” and “Inspired by your browsing history” carousels.
+
+Contextual trust signals such as ratings and reviews.
+
+Amazon continuously evaluates these via A/B testing and offline metrics like RMSE, precision@k, and diversity.
+
+5. Include specific recommendations about how to improve the site's recommendation capabilities going forward. 
+
+Transparency by Showing why a product is recommended (“Because you viewed X”).
+
+Diversity by Injecting serendipity to avoid repetitive suggestions and “filter bubbles.”
+
+Privacy & Control which includes letting users see and adjust what data informs their recommendations.
+
+Dual-Scenario Optimization that separate user-based personalization from organization level business optimization (e.g., balancing personalization with inventory or profit goals).
+
+Conclusion
+
+Amazon’s recommender system exemplifies a robust data science workflow from data acquisition (clickstreams, purchases), cleaning and modeling (collaborative and content-based filtering), to evaluation (A/B testing).
+It serves both the users’ goal of discovering relevant products and the organization’s goal of increasing engagement and sales.
+By enhancing transparency and control, Amazon can further improve user trust and longterm satisfaction.
