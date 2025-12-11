@@ -534,5 +534,6 @@ ggplot(bronx_summary, aes(x = avg_gsf, y = avg_sale_price)) +
 ### ---------------------------------------------Pricilla-----------------------------------------------
 
 # References
-
+Tableau Visualisation
+https://public.tableau.com/app/profile/pricilla.nakyazze/viz/FInalWorkbook_17654919165070/Dashboard1?publish=yes
 “NYC Citywide Rolling Calendar Sales: NYC Open Data.” NYC Citywide Rolling Calendar Sales \| NYC Open Data, Department of Finance, 18 Nov. 2025, data.cityofnewyork.us/dataset/NYC-Citywide-Rolling-Calendar-Sales/usep-8jbt/about_data.
