@@ -1,0 +1,538 @@
+
+
+
+---
+title: "DATA 607 Final Project"
+author: "James Chun, Pricilla Nakyazze, Haoming Chen"
+output:
+  pdf_document: default
+  html_document: default
+  latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# New York City Property Market
+
+## Overview
+
+This project seeks to research NYC property sales patterns and identify which features may affect sales prices. Such features may include neighborhood, building type, land/gross square footage, tax class and year built. Our goal is to uncover the price distribution in the citywide and trends that could help predict future property values.
+
+Two data sources will be used: a csv file of NYC rolling sales (***citation needed***) and the City of New York API endpoint (Department of Finance). The workflow will include importing data, tidying and cleaning the data, followed by summary statistics, visualizations, analysis and conclusions. One new feature we plan to use is ggmap. This R package perfectly matches our project as it can map NYC property prices to visualize distribution citywide.
+
+Although a database and diagram are not required by the checklist, we still design a MySQL database to store data for its convenience.
+
+## Libraries
+
+```{r message=FALSE}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+```
+
+## Import Data
+
+As mentioned before, the main datasets we will be using are NYC rolling sales CSV and City of New York API.
+
+```{r}
+nyc_rolling_sales <- read.csv("https://raw.githubusercontent.com/vincent-usny/607-final-/refs/heads/main/NYC_Rolling_Sales.csv")
+
+nyc_api <- jsonlite::fromJSON("https://data.cityofnewyork.us/resource/5ebm-myj7.json?$limit=10000")
+```
+
+## Data Cleaning
+
+Preliminary data cleaning is needed for both data sets. To begin, tidying and cleaning will be performed on each data set separately. Afterwards, further cleaning will be done to make each data set appear more like each other.
+
+### NYC Rolling Sales
+
+Begin by creating a new column to store address information. This will be used later in the data visualization stage and ggmap incorporation.
+
+```{r rolling-sales-address}
+nyc_rolling_sales <- nyc_rolling_sales %>%
+  mutate(address = as.character(paste(ADDRESS, ZIP.CODE, "NY")))
+```
+
+Secondly, remove columns that contain little to no information (i.e. are plagued with NA's). Then, we will also remove columns that contain information irrelevant to our goals. Note that some of the columns state information at present and during time of sale, we will drop the former.
+
+```{r rolling-sales-column-cleaning}
+nyc_rolling_sales <- nyc_rolling_sales %>%
+  select(-EASE.MENT, -APARTMENT.NUMBER, -BUILDING.CLASS.AT.PRESENT, -SALE.DATE, -RESIDENTIAL.UNITS, -COMMERCIAL.UNITS, -LOT, -BLOCK, -TAX.CLASS.AT.PRESENT, -ZIP.CODE, -ADDRESS) 
+```
+
+Next, information in the 'Borough' column will be changed to state the actual name of the borough an not its BBL designation. For reference:<br> 1 - Manhattan<br> 2 - Bronx<br> 3 - Brooklyn<br> 4 - Queens<br> 5 - Staten Island.
+
+```{r rolling-sales-borough-cleaning}
+nyc_rolling_sales <- nyc_rolling_sales %>%
+  mutate(
+    BOROUGH = case_when(
+      BOROUGH == 1 ~ "Manhattan",
+      BOROUGH == 2 ~ "Bronx",
+      BOROUGH == 3 ~ "Brooklyn",
+      BOROUGH == 4 ~ "Queens",
+      BOROUGH == 5 ~ "Staten Island"
+    )
+  )
+```
+
+The last thing to perform on ***nyc_rolling_sales*** will be removing any rows that contain any missing values in any of the columns. The motivation for this is to drastically cut down on analysis frustrations that may come up later.
+
+```{r rolling-sales-missing-cleaning}
+nyc_rolling_sales <- nyc_rolling_sales %>%
+  filter(if_all(everything(), ~ !is.na(.) & . != ""))
+```
+
+### NYC API
+
+For the most part, the ***nyc_api*** data set is in good order, but there is still some minor cleaning needed. For starters, we will remove the year column. The missing values will also be handled at this step.
+
+```{r nyc-api-column-cleaning}
+nyc_api <- nyc_api %>%
+  select(-year)
+
+nyc_api <- nyc_api %>%
+  filter(if_all(everything(), ~ !is.na(.) & . != ""))
+```
+
+Next, modify the borough names.
+
+```{r nyc-api-borough-cleaning}
+nyc_api <- nyc_api %>%
+  mutate(
+    borough = case_when(
+      borough == 1 ~ "Manhattan",
+      borough == 2 ~ "Bronx",
+      borough == 3 ~ "Brooklyn",
+      borough == 4 ~ "Queens",
+      borough == 5 ~ "Staten Island"
+    )
+  )
+```
+
+The last thing to perform on ***nyc_api*** will be adjusting the information in column 'type_of_home' to match those that appear in ***nyc_rolling_sales***.
+
+```{r nyc-api-type-home-cleaning}
+nyc_api <- nyc_api %>%
+  mutate(type_of_home = case_when(
+    grepl("^01[- ]*ONE FAMILY", type_of_home) ~ "01 ONE FAMILY DWELLINGS",
+    grepl("^02[- ]*TWO FAMILY", type_of_home) ~ "02 TWO FAMILY DWELLINGS",
+    grepl("^03[- ]*THREE FAMILY", type_of_home) ~ "03 THREE FAMILY DWELLINGS"
+  ))
+```
+
+The final data cleaning will be done on both dataframes and will be simply renaming the columns to follow one coherent convention.
+
+```{r both-column-name-cleaning}
+colnames(nyc_rolling_sales) <- c("borough", "neighborhood", "building category", "total units", "land square feet", "gross square feet", "year built", "tax class", "building class", "sale price", "address")
+
+colnames(nyc_api) <- c("borough", "neighborhood", "building category", "number of sales", "lowest sale price", "average sale price", "median sale price", "highest sale price")
+```
+
+## Data Visualization
+
+The data will be visualized in the traditional ways, using plots and graphs, but also using a new function: ggmap. Due to the geographical nature of our data, it is beneficial to be able to display said data on a map. That being said, AI was used during the implementation of ggmap and assisted in teaching us how to use it and some minor implementation cues.
+
+```{r ggmap-visualization}
+# See scratch code below
+```
+
+###------------------------------------------------------Pricilla-----------------------------------------
+Take the leading #$ from sale price.
+I filter out records where the relevant field value is zero. This should be done cautiously to avoid misrepresenting the data. But if a property`s sale price is Zero then it`s not for sale.
+```{r}
+
+
+# Clean numeric fields by removing non-numeric characters
+nyc_rolling_sales_clean <- nyc_rolling_sales %>%
+  mutate(
+    `gross square feet` = as.numeric(gsub("[^0-9]", "", `gross square feet`)),
+    `sale price` = as.numeric(gsub("[^0-9]", "", `sale price`)),
+    `gross square feet` = as.numeric(gsub("[^0-9]", "", `gross square feet`)),
+    `land square feet` = as.numeric(gsub("[^0-9]", "", `land square feet`)),
+    `year built` = as.numeric(gsub("[^0-9]", "", `year built`))
+  )
+
+# 1. Property with the highest gross square feet
+highest_gsf <- nyc_rolling_sales_clean %>%
+  arrange(desc(`gross square feet`)) %>%
+  slice(1)
+
+# 2. Property with the lowest non-zero sale price
+lowest_sale <- nyc_rolling_sales_clean %>%
+  filter(`sale price` > 0) %>%
+  arrange(`sale price`) %>%
+  slice(1)
+
+```
+
+
+
+
+Which property has the lowest sale price that is not Zero?
+
+```{r}
+lowest_sale_building_per_borough <- nyc_rolling_sales_clean %>%
+  filter(`sale price` > 0) %>%              # remove missing / zero values
+  group_by(borough) %>%
+  slice_min(order_by = `sale price`, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+kable(
+  lowest_sale_building_per_borough,
+  caption = "Property with Lowest sale price greater than 0 by Borough"
+)
+```
+
+What is the largest building by gross square feet that is for sale by Borough?
+
+```{r}
+largest_building_per_borough <- nyc_rolling_sales_clean %>%
+  filter(`gross square feet` > 0) %>%              # remove missing / zero values
+  group_by(borough) %>%
+  slice_max(order_by = `gross square feet`, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+kable(
+  largest_building_per_borough,
+  caption = "Property with Highest Gross Square Feet by Borough"
+)
+```
+
+
+
+ 
+SUMMARY STATISTICS
+
+
+That will be Useful for understanding the distribution of key numeric variables. All buildings of $0 sale price are excluded.
+```{r}
+borough_summary <- (
+  nyc_rolling_sales_clean %>%
+    filter(`sale price` > 0) %>%  # only include positive sale prices
+    group_by(borough) %>%
+    summarise(
+      min_price = min(`sale price`, na.rm = TRUE),
+      max_price = max(`sale price`, na.rm = TRUE),
+      median_price = median(`sale price`, na.rm = TRUE),
+      avg_sale_price = mean(`sale price`, na.rm = TRUE),  # NEW
+      avg_gsf = mean(`gross square feet`, na.rm = TRUE),
+      avg_lsf = mean(`land square feet`, na.rm = TRUE),
+      avg_year_built = mean(`year built`, na.rm = TRUE),
+      .groups = "drop"
+    )
+)
+```
+
+
+
+
+
+```{r}
+kable(borough_summary, caption = "Borough Summary Statistics")
+```
+Question
+
+Which NYC borough has the most expensive listing based on maximum sale price, and which borough has the oldest buildings on average?
+
+Answer
+
+Manhattan has the most expensive listing, with a maximum sale price of $1,080,000,000 and it also has the oldest buildings on average, with an average year built of 1922.
+
+Maximum Sale Price by Borough
+
+
+```{r}
+ggplot(borough_summary, aes(x = borough, y = max_price, fill = borough)) +
+  geom_col() +
+  geom_text(
+    aes(label = round(avg_year_built, 0)),
+    vjust = 1.5,          # moves text inside the bar
+    color = "white",      # readable against fill color
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Maximum Sale Price by Borough",
+    x = "Borough",
+    y = "Max Sale Price ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),
+    legend.position = "none"
+  )
+```
+How do sale prices vary? 
+
+Distribution of Sale Prices by Borough
+
+```{r}
+
+
+ggplot(
+  nyc_rolling_sales_clean %>% filter(`sale price` > 0),
+  aes(x = borough, y = `sale price`, fill = borough)
+) +
+  geom_boxplot() +
+  scale_fill_manual(values = c(
+    "Bronx" = "#1f78b4",
+    "Brooklyn" = "#33a02c",
+    "Manhattan" = "#e31a1c",
+    "Queens" = "#ff7f00",
+    "Staten Island" = "#6a3d9a"
+  )) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Distribution of Sale Prices by Borough",
+    x = "Borough",
+    y = "Sale Price ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),
+    legend.position = "none"
+  )
+
+```
+
+Demonstrating that Distribution of Sale Prices by Borough Log Scale better visualises the data.
+```{r}
+ggplot(
+  nyc_rolling_sales_clean %>% filter(`sale price` > 0),
+  aes(x = borough, y = `sale price`, fill = borough)
+) +
+  geom_boxplot() +
+  scale_y_log10(labels = scales::comma) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Distribution of Sale Prices by Borough (Log Scale)",
+    x = "Borough",
+    y = "Sale Price ($)"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),
+    legend.position = "none"
+  )
+```
+
+
+
+
+Most sales occur under 2 million, which is tiny compared to the highest sale nearly 1 Billion.
+
+As a result, the boxes and medians get compressed into a thin line near zero.
+
+So visually, you only see small black dots and very short boxplots near the bottom.
+
+Manhattan has the highest concentration of extremely expensive sales seen by the tallest dots (outliers).
+
+These represent Manhattan`s luxury buildings and commercial properties selling for hundreds of millions.
+
+Brooklyn has a few outliers close to $300M.
+
+Queens and Bronx outliers are lower (tens of millions).
+
+Staten Island is the borough with lowest priced housing.
+
+
+
+RANGE OF COST FOR ONE FAMILY HOME IN ALL NYC BOROUGHS.
+
+
+Because the ORIGINAL dataset includes Commercial towers, Mixed use buildings, Large multifamily buildings, Luxury skyscrapers and Outlier sales in the hundreds of millions these push the y axis so high that the typical homes become invisible. So I will filter to only look at the price range of 1 family homes in all boroughs.
+
+```{r}
+# Filter for one-family homes with valid sale prices
+nyc_residential <- nyc_rolling_sales_clean %>%
+  filter(
+    `sale price` > 0,
+    `building category` == "01 ONE FAMILY DWELLINGS"
+  )
+
+# Compute IQR (typical range) per borough
+one_family_iqr <- nyc_residential %>%
+  group_by(borough) %>%
+  summarise(
+    Q1 = quantile(`sale price`, 0.25, na.rm = TRUE),
+    Median = median(`sale price`, na.rm = TRUE),
+    Q3 = quantile(`sale price`, 0.75, na.rm = TRUE),
+    IQR = IQR(`sale price`, na.rm = TRUE),
+    Typical_Range = paste0(
+      scales::comma(round(Q1)), " -- ", scales::comma(round(Q3))
+    ),
+    .groups = "drop"
+  )
+
+kable(one_family_iqr, caption = "IQR of Sale Prices for One-Family Homes")
+```
+Q1 (First Quartile) which is 25 percent of homes sold for a price or less, marks the lower end of the typical market. In the Bronx 25 percent of one family homes sold for less than or equal to 500k.
+
+Q3 (Third Quartile) stands for 75 percent of homes sold for this price or less. It marks the upper end of typical home prices. In Queens 75 percent of homes sold for less than or equal to 993k.
+
+The IQR (Interquartile Range) that is calculated by Q3 minus Q1 measures the spread of the middle 50 percent of home prices.
+A larger IQR shows more variability in typical home prices.
+
+Manhattan`s IQR at 6,412,500 is extremely wide, meaning significant price variation.
+
+1, 2, 3 Family Dwellings counts
+
+```{r}
+building_counts_0123 <- nyc_rolling_sales_clean %>%
+  filter(
+    `building category` %in% c(
+      "01 ONE FAMILY DWELLINGS",
+      "02 TWO FAMILY DWELLINGS",
+      "03 THREE FAMILY DWELLINGS"
+    )
+  ) %>%
+  group_by(borough, `building category`) %>%
+  summarise(count = n(), .groups = "drop")
+
+kable(building_counts_0123, caption = "1, 2, 3 Family Dwellings counts")
+
+
+```
+Which Borough has more 1 family vs 2 family homes?
+
+Queens has the most one family dwelling homes and Brooklyn has the most two family homes for sale.
+
+
+```{r}
+ggplot(building_counts_0123, aes(x = borough, y = count, fill = `building category`)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_x_discrete(expand = expansion(mult = 0)) +
+  labs(
+    title = "Building Category Counts (01–03) by Borough",
+    x = "Borough",
+    y = "Count",
+    fill = "Building Category"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Sale Price Distribution for One Family Homes by Borough
+
+```{r}
+ggplot(
+  nyc_residential,
+  aes(x = borough, y = `sale price`, fill = borough)
+) +
+  geom_boxplot() +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    title = "Sale Price Distribution for One Family Homes by Borough",
+    x = "Borough",
+    y = "Sale Price ($)"
+  ) +
+  theme_minimal()
+```
+
+Manhattan consistently shows the highest median sale prices, with the box (representing the interquartile range or middle 50% of sales) positioned significantly higher than all other boroughs. the average price for single family homes in Manhattan can be many millions of dollars.
+
+The Bronx generally has the lowest median sale prices for one family homes, making it the most affordable borough according to the data presented, where a significant number of sales have been recorded at or below $500,000. Brooklyn, Queens, and Staten Island exhibit similar sale price ranges in the middle of the distribution, with their boxes overlapping considerably on the log-scale Y-axis. 
+
+AVERAGE SALE PRICE BY BOROUGH
+
+Staten Island has the most affordable housing options based on Average sale price.
+
+
+
+```{r}
+suppressPackageStartupMessages(library(scales))
+ggplot(borough_summary, aes(x = reorder(borough, avg_sale_price), y = avg_sale_price, fill = borough)) +
+  geom_col(show.legend = FALSE, width = 0.7) +
+  geom_text(aes(label = scales::dollar(avg_sale_price, scale = 1, suffix = "")),
+            vjust = -0.5, size = 4, fontface = "bold") +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1, prefix = "$")) +
+  expand_limits(y = max(borough_summary$avg_sale_price) * 1.1) +  # extend y-axis by 10%
+  labs(
+    title = "Average Sale Price by Borough in NYC",
+    x = "Borough",
+    y = "Average Sale Price ($)",
+    caption = "Data source: NYC Rolling Sales"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(face = "bold", color = "#2C3E50"),
+    axis.title = element_text(face = "bold")
+  ) +
+  scale_fill_brewer(palette = "Set2")
+```
+
+Relation ship between price and square foot Manhattan and the Bronx
+
+In Manhattan an average of square feet of 45711 costs 17 million while in the Bronx around 6625 square feet cost 1.6 million.
+
+```{r}
+ggplot(borough_summary, aes(x = avg_gsf, y = avg_sale_price)) +
+  geom_point(aes(color = borough), size = 5, show.legend = FALSE) +
+  geom_text(aes(label = borough), vjust = -1, fontface = "bold") +  # label points
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue", linetype = "dashed") +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1, prefix = "$")) +
+  labs(
+    title = "Relationship Between Average Gross Square Feet and Sale Price by Borough",
+    x = "Average Gross Square Feet",
+    y = "Average Sale Price ($)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Taking a closer look at the Relationship between price and square feet in Manhattan.
+```{r}
+
+#Filter for Manhattan
+manhattan_summary <- borough_summary %>%
+  filter(borough == "Manhattan")
+
+# Scatter plot of avg_gsf vs avg_sale_price for Manhattan
+ggplot(manhattan_summary, aes(x = avg_gsf, y = avg_sale_price)) +
+  geom_point(size = 5, color = "darkred") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue", linetype = "dashed") +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1, prefix = "$")) +
+  labs(
+    title = "Manhattan Average Gross Square Feet and Sale Price in Manhattan",
+    x = "Average Gross Square Feet",
+    y = "Average Sale Price ($)"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+
+Taking a closer look at the Relation ship between price and square feet in the Bronx
+
+```{r}
+
+
+# Filter for Bronx
+bronx_summary <- borough_summary %>%
+  filter(borough == "Bronx")
+
+ggplot(bronx_summary, aes(x = avg_gsf, y = avg_sale_price)) +
+  geom_point(size = 5, color = "darkred") +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+    color = "darkblue",
+    linetype = "dashed",
+    na.rm = TRUE
+  ) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 1, prefix = "$")) +
+  labs(
+    title = "Bronx Average Gross Square Feet and Sale Price in Bronx",
+    x = "Average Gross Square Feet",
+    y = "Average Sale Price ($)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+### ---------------------------------------------Pricilla-----------------------------------------------
+
+# References
+
+“NYC Citywide Rolling Calendar Sales: NYC Open Data.” NYC Citywide Rolling Calendar Sales \| NYC Open Data, Department of Finance, 18 Nov. 2025, data.cityofnewyork.us/dataset/NYC-Citywide-Rolling-Calendar-Sales/usep-8jbt/about_data.
